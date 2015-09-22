@@ -12,12 +12,14 @@ import emcee
 ### input parameter
 np.random.seed(123)
 n_step = 5000
+burn = n_step/2
 a_0 = 0.; b_0 = 0.; p_0 = (a_0, b_0)
 
 
 ### generate line
 def model(a,b,x):
 	return a*x+b
+
 
 a_real = 3.
 b_real = 5.
@@ -34,7 +36,6 @@ y_data = y_real + y_shift
 ### likelihood
 def log_likely(p,x_real,y_data,y_err):
 	a,b=p
-	#print 0.-sum( (model(a,b,x_real)-y_data)**2./(2.*y_err**2.) )
 	return 0.-sum( (model(a,b,x_real)-y_data)**2./(2.*y_err**2.) )
 
 
@@ -62,10 +63,8 @@ def mcmc(x_real, y_data, y_err, a_0=a_0, b_0=b_0, a_step=0.3, b_step=0.3, n_step
 
 ### run
 a_seq, b_seq = mcmc(x_real, y_data, y_err)
-
-burn = n_step/2
 a_est, b_est = np.mean(a_seq[burn:]), np.mean(b_seq[burn:])
-
+print 'a,b = ', a_est, b_est
 
 ### MCMC with emcee package
 ndim, nwalker = 2, 10
@@ -113,4 +112,4 @@ ax13.errorbar(x_real, y_data, yerr=y_err, fmt='x')
 ax13.plot(x_real,y_real,'b-')
 ax13.plot(x_real,model(np.mean(sampler.chain[:,burn/nwalker:,0]), np.mean(sampler.chain[:,burn/nwalker:,1]), x_real),'r--')
 
-plt.savefig('plot_mcmc.png')
+plt.savefig('plot_mcmc_line.png')
