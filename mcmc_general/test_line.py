@@ -77,28 +77,38 @@ poly1_best = poly1_seq[:,np.argmin(chi1_seq)]
 poly2_best = poly2_seq[:,np.argmin(chi2_seq)]
 poly3_best = poly3_seq[:,np.argmin(chi3_seq)]
    
-print np.min(chi1_seq)/(len(x_real)-2), poly1_best
+
+'''print np.min(chi1_seq)/(len(x_real)-2), poly1_best
 print np.min(chi2_seq)/(len(x_real)-3), poly2_best
 print np.min(chi3_seq)/(len(x_real)-4), poly3_best
-
+'''
 
 
 ### plot
-plt.figure(figsize=(15,5))
+plt.figure(figsize=(21,7))
 ax1,ax2,ax3 = plt.subplot2grid((1,3),(0,0)),\
 			plt.subplot2grid((1,3),(0,1)),\
 			plt.subplot2grid((1,3),(0,2))
 
 ax1.errorbar(x_real,y_data,yerr=y_err,fmt='x')
 ax1.plot(x_real,y_real,'b-')
-ax1.plot(x_real,model_poly1(x_real,poly1_best),'r--')
+fit, = ax1.plot(x_real,model_poly1(x_real,poly1_best),'r--')
+ax1.legend([fit,fit],['reduced chi2: %.2f' % (np.min(chi1_seq)/(len(x_real)-2)), \
+'%.2f+%.2fx' % (poly1_best[0], poly1_best[1])], \
+loc=2)
 
 ax2.errorbar(x_real,y_data,yerr=y_err,fmt='x')
 ax2.plot(x_real,y_real,'b-')
-ax2.plot(x_real,model_poly2(x_real,poly2_best),'r--')
+fit, = ax2.plot(x_real,model_poly2(x_real,poly2_best),'r--')
+ax2.legend([fit,fit],['reduced chi2: %.2f' % (np.min(chi2_seq)/(len(x_real)-2)), \
+'%.2f+%.2fx+%.2fx^2' % (poly2_best[0], poly2_best[1], poly2_best[2])],\
+loc=2)
 
 ax3.errorbar(x_real,y_data,yerr=y_err,fmt='x')
 ax3.plot(x_real,y_real,'b-')
-ax3.plot(x_real,model_poly3(x_real,poly3_best),'r--')
+fit, = ax3.plot(x_real,model_poly3(x_real,poly3_best),'r--')
+ax3.legend([fit,fit],['reduced chi2: %.2f' % (np.min(chi3_seq)/(len(x_real)-2)), \
+'%.2f+%.2fx+%.2fx^2+%.2fx^3' % (poly3_best[0], poly3_best[1], poly3_best[2], poly3_best[3])], \
+loc=2)
 
 plt.savefig('fit_poly123.png')
