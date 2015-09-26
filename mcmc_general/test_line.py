@@ -35,47 +35,51 @@ y_data = y_real + y_shift
 '''
 log likelihood depends on the assumption of the data
 assuming y_data ~ N(y_real, y_err)
+In this case log_likelihood is the same thing as chi2
+and we can use chi2 to check if the model is good
 '''
 def log_likely(para, model_func, x_real, y_data, y_err):
 	y_model = model_func(x_real,para)
 	return 0.-sum( (y_model - y_data)**2./(2.* y_err**2.) )
+
+def chi2(para, model_func, x_real, y_data, y_err):
+	y_model = model_func(x_real,para)
+	return sum( (y_model - y_data)**2./(2.* y_err**2.) )
 
 
 ### test with 1st/2nd/3rd order polynomial
 p0 = np.zeros(2)
 p_step = np.ones(2) * 0.3
 
-poly1_seq = mcmc(p0, p_step, n_step, log_likely, \
-			[model_poly1,x_real,y_data,y_err],seed)
+poly1_seq, chi1_seq = mcmc(p0, p_step, n_step, log_likely, \
+			[model_poly1,x_real,y_data,y_err], seed, chi2)
 
 
 p0 = np.zeros(3)
 p_step = np.ones(3) * 0.3
 
-poly2_seq = mcmc(p0, p_step, n_step, log_likely, \
-			log_args=[model_poly2,x_real,y_data,y_err])
+poly2_seq, chi2_seq = mcmc(p0, p_step, n_step, log_likely, \
+			[model_poly2,x_real,y_data,y_err], seed, chi2)
 
 
 p0 = np.zeros(4)
 p_step = np.ones(4) * 0.3
 
-poly3_seq = mcmc(p0, p_step, n_step, log_likely, \
-			log_args=[model_poly3,x_real,y_data,y_err])
+poly3_seq, chi3_seq = mcmc(p0, p_step, n_step, log_likely, \
+			[model_poly3,x_real,y_data,y_err], seed, chi2)
 
 
 ### result
 burn_step = auto_burn(poly1_seq)
-#print burn_step
+print burn_step
 
-
-poly1_est = np.median(poly1_seq[:, burn_step:],axis=1)
-#print poly1_est
-
-poly2_est = np.median(poly2_seq[:, burn_step:],axis=1)
-#print poly2_est
-
-poly3_est = np.median(poly3_seq[:, burn_step:],axis=1)
-#print poly3_est
+poly1_best = poly1_seq[:,np.argmin(chi1_seq)]
+poly2_best = poly2_seq[:,np.argmin(chi2_seq)]
+poly3_best = poly3_seq[:,np.argmin(chi3_seq)]
+   
+print np.min(chi1_seq)/(len(x_real)-2), poly1_best
+print np.min(chi2_seq)/(len(x_real)-3), poly2_best
+print np.min(chi3_seq)/(len(x_real)-4), poly3_best
 
 
 
@@ -87,14 +91,14 @@ ax1,ax2,ax3 = plt.subplot2grid((1,3),(0,0)),\
 
 ax1.errorbar(x_real,y_data,yerr=y_err,fmt='x')
 ax1.plot(x_real,y_real,'b-')
-ax1.plot(x_real,model_poly1(x_real,poly1_est),'r--')
+ax1.plot(x_real,model_poly1(x_real,poly1_best),'r--')
 
 ax2.errorbar(x_real,y_data,yerr=y_err,fmt='x')
 ax2.plot(x_real,y_real,'b-')
-ax2.plot(x_real,model_poly2(x_real,poly2_est),'r--')
+ax2.plot(x_real,model_poly2(x_real,poly2_best),'r--')
 
 ax3.errorbar(x_real,y_data,yerr=y_err,fmt='x')
 ax3.plot(x_real,y_real,'b-')
-ax3.plot(x_real,model_poly3(x_real,poly3_est),'r--')
+ax3.plot(x_real,model_poly3(x_real,poly3_best),'r--')
 
 plt.savefig('fit_poly123.png')

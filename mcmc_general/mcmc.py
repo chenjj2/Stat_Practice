@@ -10,14 +10,23 @@ import numpy as np
 
 
 ''' mcmc'''
-def mcmc(p0, p_step, n_step, log_likely_func, log_args=[], *seed):
-	# random seed
-	if seed: np.random.seed(seed[0])
+def mcmc(p0, p_step, n_step, log_likely_func, data=[], seed=2357, *check_func):
+	# set random seed
+	np.random.seed(seed)
 
 	# setup parameter chain
 	n_para = len(p0)
 	p_seq = np.zeros((n_para, n_step))
 	p_seq[:,0] = p0
+
+	# setup check function (eg. chi2), otherwise return log likelihood
+	if check_func:
+		check = check_func[0]
+	else:
+		check = log_likely_func
+
+	check_seq = np.zeros(n_step)
+	check_seq[0] = check(p_seq[:,0],*data)
 
 	# advance with p_step and check if accept p_new
 	for i_step in range(1,n_step):
@@ -25,8 +34,8 @@ def mcmc(p0, p_step, n_step, log_likely_func, log_args=[], *seed):
 		p_old = p_seq[:, i_step-1]
 		p_new = p_old + p_step * np.random.uniform(-1,1,n_para)
 
-		delta_log = log_likely_func(p_new, *log_args) - \
-					log_likely_func(p_old, *log_args)
+		delta_log = log_likely_func(p_new, *data) - \
+					log_likely_func(p_old, *data)
 
 		ratio = np.exp(delta_log)
 		if (np.random.uniform(0,1) < ratio):
@@ -34,7 +43,9 @@ def mcmc(p0, p_step, n_step, log_likely_func, log_args=[], *seed):
 		else:
 			p_seq[:,i_step] = p_old
 
-	return p_seq
+		check_seq[i_step] = check(p_seq[:,i_step],*data)
+
+	return p_seq, check_seq
 
 
 
