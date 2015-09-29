@@ -9,7 +9,7 @@ function:
 import numpy as np
 
 
-''' mcmc'''
+''' mcmc '''
 def mcmc(p0, p_step, n_step, log_likely_func, data=[], seed=2357, *check_func):
 	# set random seed
 	np.random.seed(seed)
@@ -48,8 +48,54 @@ def mcmc(p0, p_step, n_step, log_likely_func, data=[], seed=2357, *check_func):
 	return p_seq, check_seq
 
 
+''' hbm (hierarchical bayesian model) '''
+def hbm(hyper0, hyper_step, n_step, draw_local_func, n_group, log_likely_func, model, data=[], seed=2357):
 
-''' auto_burn'''
+	np.random.seed(seed)
+
+	# initial setup: hyper, local, loglike
+	n_hyper = len(hyper0)
+	hyper = np.zeros((n_hyper,n_step))
+	hyper[:,0] = hyper0
+
+	n_local = len(draw_local_func(hyper[:,0]))
+	local = np.zeros((n_local,n_group,n_step))
+	for i_group in range(n_group):
+		local[:,i_group,0] = draw_local_func(hyper[:,0])
+
+	loglike = np.zeros(n_step)
+	loglike[0] = log_likely_func(local[:,:,0], model, *data)
+
+	# run mcmc: hyper walks, generates local, calculate delta_log, accept/reject
+	for i_step in range(1,n_step):
+		hyper_old = hyper[:, i_step-1]
+		hyper_new = hyper_old + hyper_step * np.random.uniform(-1,1,n_hyper)
+
+		local_old = local[:,:,i_step-1]
+		local_new = np.zeros((n_local,n_group))
+		for i_group in range(n_group):
+			local_new[:,i_group] = draw_local_func(hyper_new)
+
+		delta_log = log_likely_func(local_new, model, *data) - \
+					log_likely_func(local_old, model, *data)
+
+		ratio = np.exp(delta_log)
+		if (np.random.uniform(0,1) < ratio):
+			hyper[:,i_step] = hyper_new
+			local[:,:,i_step] = local_new
+		else:
+			hyper[:,i_step] = hyper_old
+			local[:,:,i_step] = local_old
+
+		loglike[i_step] = log_likely_func(local[:,:,i_step], model, *data)
+
+	return hyper, local, loglike
+
+
+
+''' auto_burn '''
+### pick the first step that p == median(p_chain)
+
 def almost_equal(array,value,tolerance=0.):
 	diff = np.abs(array - value)
 	return diff<=tolerance
@@ -73,6 +119,9 @@ def auto_burn(p_seq, tolerance=[], fix_ratio=0.5):
 
 	burn_step = np.max(burn)
 
+	# if the NO burn in, just use the last half of the chain
 	if burn_step==n_step-1: burn_step= int(n_step * fix_ratio)
 	
 	return burn_step
+
+
