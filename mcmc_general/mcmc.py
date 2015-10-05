@@ -1,12 +1,25 @@
 '''
 function:
-1. mcmc
-2. auto_burn
+* mcmc
+* hbm
+* auto_burn
 
 '''
 
 # import
 import numpy as np
+
+''' domain_pass ''' 
+# incase the parameter jumps outside the domain
+def domain_pass(para, domain):
+
+	n_require = len(domain)
+	for i in range(n_require):
+		require = domain[i]
+		target = para[require[0]]
+		if not (target>require[1]) & (target<require[2]): return False
+	
+	return True
 
 
 ''' mcmc '''
@@ -36,6 +49,8 @@ def mcmc(p0, p_step, n_step, log_likely_func, data=[], seed=2357, *check_func):
 
 		delta_log = log_likely_func(p_new, *data) - \
 					log_likely_func(p_old, *data)
+		# ?? local prior likelihood
+		# log(data|local)+log(local|local prior)
 
 		ratio = np.exp(delta_log)
 		if (np.random.uniform(0,1) < ratio):
@@ -49,7 +64,8 @@ def mcmc(p0, p_step, n_step, log_likely_func, data=[], seed=2357, *check_func):
 
 
 ''' hbm (hierarchical bayesian model) '''
-def hbm(hyper0, hyper_step, n_step, draw_local_func, n_group, log_likely_func, model, data=[], seed=2357):
+def hbm(hyper0, hyper_step, n_step, draw_local_func, n_group, log_likely_func, model, \
+data=[], seed=2357, domain=[], draw_times=10):
 
 	np.random.seed(seed)
 
@@ -63,33 +79,59 @@ def hbm(hyper0, hyper_step, n_step, draw_local_func, n_group, log_likely_func, m
 	for i_group in range(n_group):
 		local[:,i_group,0] = draw_local_func(hyper[:,0])
 
-	loglike = np.zeros(n_step)
+	loglike = np.repeat(-np.inf,n_step)
 	loglike[0] = log_likely_func(local[:,:,0], model, *data)
 
+	repeat = np.zeros((n_step,), dtype=np.int)
+	repeat[n_step-1] = 1
+
+	ratio_seq = np.zeros(n_step-1)
+
 	# run mcmc: hyper walks, generates local, calculate delta_log, accept/reject
-	for i_step in range(1,n_step):
-		hyper_old = hyper[:, i_step-1]
-		hyper_new = hyper_old + hyper_step * np.random.uniform(-1,1,n_hyper)
+	for i_step in range(0, n_step-1):
+		step_stay = True		
+		while step_stay & (np.sum(repeat)<100000):
+			repeat[i_step] = repeat[i_step]+1
 
-		local_old = local[:,:,i_step-1]
-		local_new = np.zeros((n_local,n_group))
-		for i_group in range(n_group):
-			local_new[:,i_group] = draw_local_func(hyper_new)
+			hyper_old = hyper[:, i_step]
+			hyper_new = hyper_old + hyper_step * np.random.uniform(-1,1,n_hyper)
 
-		delta_log = log_likely_func(local_new, model, *data) - \
-					log_likely_func(local_old, model, *data)
+			# reject new step if out of domain
+			if len(domain) != 0:
+				if not domain_pass(hyper_new,domain): continue
 
-		ratio = np.exp(delta_log)
-		if (np.random.uniform(0,1) < ratio):
-			hyper[:,i_step] = hyper_new
-			local[:,:,i_step] = local_new
-		else:
-			hyper[:,i_step] = hyper_old
-			local[:,:,i_step] = local_old
+			#FIXME
+			ratio_draw = np.zeros(draw_times)
+			for i_draw in range(draw_times):
 
-		loglike[i_step] = log_likely_func(local[:,:,i_step], model, *data)
+				local_old = local[:,:,i_step]
+				local_new = np.zeros((n_local,n_group))
+				for i_group in range(n_group):
+					local_new[:,i_group] = draw_local_func(hyper_new)
 
-	return hyper, local, loglike
+				delta_log = log_likely_func(local_new, model, *data) - \
+							log_likely_func(local_old, model, *data)
+				# add a hyper likelihood
+
+				ratio_draw[i_draw] = np.exp(delta_log)
+			ratio = np.mean(ratio_draw)
+
+			#ENDFIXME
+
+			# accept new step
+			if (np.random.uniform(0,1) < ratio):
+				hyper[:,i_step+1] = hyper_new
+				local[:,:,i_step+1] = local_new
+				loglike[i_step+1] = log_likely_func(local[:,:,i_step+1], model, *data)
+				step_stay = False
+				ratio_seq[i_step] = ratio
+
+			# reject new step
+			else: pass
+
+			ratio_seq[np.where(ratio_seq>1.)[0]] = 1.
+
+	return hyper, local, loglike, repeat, ratio_seq 
 
 
 
