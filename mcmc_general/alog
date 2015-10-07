@@ -1,0 +1,9 @@
+the scatter of hyper parameters should not be too small compared to the data err scale. Otherwise, we could just consider the different groups of data to belong to the same group.
+
+
+what kinds of data has very low acceptance rate:
+- large n_group
+- large hyper_sigma
+- small data_err_size
+
+
