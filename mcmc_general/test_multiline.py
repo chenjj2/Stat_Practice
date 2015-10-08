@@ -22,10 +22,10 @@ np.random.seed(seed)
 
 hyper_c1 = 3.
 hyper_c0 = 5.
-n_group = 3
-n_point = 50
-hyper_sigc1 = 1e-1
-hyper_sigc0 = 1e-1
+n_group = 5
+n_point = 10
+hyper_sigc1 = 1e0
+hyper_sigc0 = 1e0
 
 local_c1 = np.random.normal( loc=hyper_c1, scale = hyper_sigc1, size=n_group )
 local_c0 = np.random.normal( loc=hyper_c0, scale = hyper_sigc0, size=n_group )
@@ -33,7 +33,7 @@ local_c0 = np.random.normal( loc=hyper_c0, scale = hyper_sigc0, size=n_group )
 x_real = np.zeros((n_point,n_group))
 y_data = np.zeros((n_point,n_group))
 y_err = np.zeros((n_point,n_group))
-err_size = 3.
+err_size = 2.
 
 for i in range(n_group):
 	x_real[:,i] = np.sort(np.random.uniform(-5,5,n_point))
@@ -41,6 +41,8 @@ for i in range(n_group):
 	y_err[:,i] = err_size * np.random.random(n_point)
 	y_data[:,i] = y_real + np.random.normal(loc=0., scale=y_err[:,i], size=n_point)
 
+print 'hyper: c1 * x + c0', hyper_c1, hyper_c0, hyper_sigc1, hyper_sigc0
+print 'local (c0,c1):', local_c0, local_c1
 
 
 '''
@@ -63,15 +65,14 @@ def draw_local_func(hyper):
 
 ### mcmc
 n_hyper = 4 # hyper_c1, hyper_c0, hyper_sigc1, hyper_sigc0
-hyper0 = np.array([hyper_c1,hyper_c0,hyper_sigc1,hyper_sigc0]) 
-hyper_step = np.array([1e-2,1e-2,1e-2,1e-2]) # randomly selected step size
+hyper0 = 2.*np.array([hyper_c1,hyper_c0,hyper_sigc1,hyper_sigc0]) 
+hyper_step = np.array([3e-1,3e-1,1e-1,1e-1]) # randomly selected step size
 
-hyper_seq, loglike_seq, repeat_seq = \
+hyper_seq, loglike_seq, repeat_seq, i_step = \
 hbm(hyper0, hyper_step, n_step, draw_local_func, n_group, single_log_likely, model, \
 data=[x_real,y_data,y_err], seed=2357, domain=[[2,0,np.inf],[3,0,np.inf]], \
-draw_times=100, single_jump = True, trial_upbound = 10000 )
+draw_times=20, single_jump = False, trial_upbound = 1e6 )
 
-print hyper_seq[0,:]
 
 
 ### plot
@@ -84,25 +85,27 @@ ax = ((a00,a01,a02,a03),(a10,a11,a12,a13))
 #for j in range(col):
 	#ax[0][j].plot(np.repeat(hyper_seq[j,:],repeat),'b-')
 
-
 for i_group in range(n_group):
-	ax[0][0].errorbar(x_real[:,i_group],y_data[:,i_group],yerr = y_err[:,i_group],fmt='r.')
-	ax[0][0].plot(x_real[:,i_group],model(x_real[:,i_group],(local_c0[i], local_c1[i])),'b-')
+	ax[0][0].errorbar(x_real[:,i_group],y_data[:,i_group],yerr = y_err[:,i_group],fmt='.')
+	ax[0][0].plot(x_real[:,i_group],model(x_real[:,i_group],(local_c0[i_group], local_c1[i_group])),'-')
 ax[0][0].legend(['c0 %.1f' %hyper_c0, 'c1 %.1f' %hyper_c1, 'sig_c0 %.1f' %hyper_sigc0, 'sig_c1 %.1f' %hyper_sigc1],\
 loc=0)
 
-ax[0][1].plot(repeat_seq,'b-')
-ax[0][1].set_ylabel('repeat times')
+ax[0][1].plot(repeat_seq[:i_step],'bx-')
+ax[0][1].set_xlabel('repeat times')
 
 delta_log = loglike_seq[1:] - loglike_seq[:-1]
 ratio  = np.exp(delta_log)
 ratio[np.where(ratio>1)[0]] = 1
-ax[0][2].plot(ratio, 'b-')
-ax[0][2].set_ylabel('ratio')
+ax[0][2].plot(ratio[:i_step-1], 'bx-')
+ax[0][2].set_xlabel('ratio')
+
+ax[0][3].plot(loglike_seq[:i_step],'bx-')
+ax[0][3].set_xlabel('loglike')
 
 
 for j in range(col):
-	ax[1][j].plot(hyper_seq[j,:],'b-')
+	ax[1][j].plot(hyper_seq[j,:i_step],'bx-')
 
 
 ax[1][0].set_xlabel('hyper_c1')

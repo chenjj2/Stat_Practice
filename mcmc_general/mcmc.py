@@ -33,8 +33,8 @@ def jump(para_old, para_stepsize, single_jump):
 	n_para = len(para_old)
 	if single_jump:
 		ind_para = np.random.choice(n_para,1)
-		para_new = para_old
-		para_new[ind_para] += para_stepsize[ind_para] * np.random.normal(0.,1.)
+		para_new = para_old + 0.
+		para_new[ind_para] = para_new[ind_para] + para_stepsize[ind_para] * np.random.normal(0.,1.)
 	else:
 		para_new = para_old + para_stepsize * np.random.normal(0.,1.,n_para)
 	return para_new
@@ -62,7 +62,7 @@ def mcmc(p0, p_step, n_step, log_likely_func, data=[], seed=2357, *check_func):
 	# advance with p_step and check if accept p_new
 	for i_step in range(1,n_step):
 
-		p_old = p_seq[:, i_step-1]
+		p_old = p_seq[:, i_step-1]+0.
 		p_new = p_old + p_step * np.random.uniform(-1,1,n_para)
 
 		delta_log = log_likely_func(p_new, *data) - \
@@ -98,6 +98,7 @@ def hbm_initial(hyper0, n_step):
 
 ''' hbm p(data|hyper)'''
 # sum of log average likelihood
+# DONT log{mean[exp(loglikelihood)]}, causing overflow and making comparison impossible
 def hbm_likelihood(hyper,draw_local_func,draw_times,n_group,log_likely_func,model,data=[]):
 	n_local = len(draw_local_func(hyper))
 	loglike_each = np.zeros((draw_times, n_group))
@@ -105,11 +106,15 @@ def hbm_likelihood(hyper,draw_local_func,draw_times,n_group,log_likely_func,mode
 		for i_draw in range(draw_times):
 			local = draw_local_func(hyper)
 			loglike_each[i_draw,i_group] = log_likely_func(local, model, *data)
-	like_each = np.exp(loglike_each)
-	like_group = np.mean(like_each,axis=0)
-	loglike = np.sum(np.log(like_group))
 
-	return loglike
+	median = np.median(loglike_each,axis=0)
+	delta = loglike_each-median
+	mean_ratio_of_median = np.mean(np.exp(delta),axis=0)
+	
+	loglikelihood = median + np.log(mean_ratio_of_median)
+	total_loglike = np.sum(loglikelihood)
+
+	return total_loglike
 
 
 ''' hbm with mcmc '''
@@ -119,36 +124,47 @@ data=[], seed=2357, domain=[], draw_times=1, single_jump = False, trial_upbound 
 	np.random.seed(seed)
 
 	### initial setup: hyper, local, loglike
-	hyper, loglike, repeat = hbm_initial(hyper0, n_step)
-	loglike[0] = hbm_likelihood(hyper0,draw_local_func,draw_times,n_group,log_likely_func,model,data)
+	hyper_chain, loglike, repeat = hbm_initial(hyper0, n_step)
+	loglike0 = hbm_likelihood(hyper0,draw_local_func,draw_times,n_group,log_likely_func,model,data)
+	loglike[0] = loglike0	
+
+	loglike_old = loglike0
+	hyper_old = hyper0
+
 
 	### run mcmc: hyper walks, generates local, calculate delta_log, accept/reject
 	for i_step in range(0, n_step-1):
-		step_stay = True		
+				
+		if (np.sum(repeat)>=trial_upbound):
+			break
+
+		step_stay = True
 		while step_stay & (np.sum(repeat)<trial_upbound):
 			repeat[i_step] = repeat[i_step]+1
 
-			hyper_old = hyper[:, i_step]
 			hyper_new = jump(hyper_old, hyper_stepsize, single_jump)
 
 			# reject new step if out of domain
 			if len(domain) != 0:
-				if not domain_pass(hyper_new,domain): continue
+				if not domain_pass(hyper_new,domain): 
+					continue
 			
 			loglike_new = hbm_likelihood(hyper_new,draw_local_func,draw_times,n_group,log_likely_func,model,data)
-
-			ratio = np.exp(loglike_new - loglike[i_step])
-
+			
+			ratio_tmp = np.exp(loglike_new - loglike_old)
+	
 			# accept new step
-			if (np.random.uniform(0,1) < ratio):
-				hyper[:,i_step+1] = hyper_new
+			if (np.random.uniform(0,1) < ratio_tmp):
+				hyper_chain[:,i_step+1] = hyper_new
+				hyper_old = hyper_new + 0.
 				loglike[i_step+1] = loglike_new
+				loglike_old = loglike_new + 0.
 				step_stay = False
 
 			# reject new step
 			else: pass
 
-	return hyper, loglike, repeat
+	return hyper_chain, loglike, repeat, i_step
 
 
 
