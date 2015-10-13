@@ -13,13 +13,14 @@ from mcmc import hbm
 
 
 ### input for mcmc
-n_step = 50
+n_step = 2000
 
 
 ### generate line
 seed = 2357
 np.random.seed(seed)
 
+'''
 hyper_c1 = 3.
 hyper_c0 = 5.
 n_group = 10
@@ -43,15 +44,29 @@ for i in range(n_group):
 
 print 'hyper: c1 * x + c0', hyper_c1, hyper_c0, hyper_sigc1, hyper_sigc0
 #print 'local (c0,c1):', local_c0, local_c1
+'''
+
+### read data from jags/data/hierarchical_linear
+data = np.genfromtxt('/Users/jingjing/Work/JAGSExamples/data/hierarchical/hierarchical_linear.csv', skiprows=1, delimiter=',')
+group,index,x,y,a,b = data[:,0], data[:,1], data[:,2], data[:,3], data[:,4], data[:,5]
+n_group = 10
+n_point = 100
+local_c1 = np.unique(a)
+local_c0 = np.unique(b)
+x_real = np.transpose(np.reshape(x,(10,100)))
+y_data = np.transpose(np.reshape(y,(10,100)))
+
+print 'c0', np.mean(local_c0), np.std(local_c0)
+print 'c1', np.mean(local_c1), np.std(local_c1)
 
 
 '''
 log likelihood depends on the assumption of the data
 assuming y_data ~ N(y_real, y_err)
 '''
-def single_log_likely(para, model_func, x_real, y_data, y_err):
+def single_log_likely(para, model_func, x_real, y_data):
 	y_model = model_func(x_real,para)
-	return 0.-np.sum( (y_model - y_data)**2./(2.* y_err**2.) )
+	return 0.-np.sum( (y_model - y_data)**2. )
 
 
 
@@ -69,13 +84,13 @@ print 'start:', time.asctime()
 
 
 n_hyper = 4 # hyper_c1, hyper_c0, hyper_sigc1, hyper_sigc0
-hyper0 = 2.*np.array([hyper_c1,hyper_c0,hyper_sigc1,hyper_sigc0]) 
+hyper0 = np.array([10.,-15.,1.,1.,]) 
 hyper_step = np.array([1e-1,1e-1,1e-1,1e-1]) # randomly selected step size
 
 hyper_seq, loglike_seq, repeat_seq, i_step = \
 hbm(hyper0, hyper_step, n_step, draw_local_func, n_group, single_log_likely, model, \
-data=[x_real,y_data,y_err], seed=2357, domain=[[2,0,np.inf],[3,0,np.inf]], \
-draw_times=5000, single_jump = True, trial_upbound = 100 )
+data=[x_real,y_data], seed=2357, domain=[[2,0,np.inf],[3,0,np.inf]], \
+draw_times=100, single_jump = False, trial_upbound = 1e5 )
 
 print 'end:', time.asctime()
 
@@ -90,10 +105,10 @@ ax = ((a00,a01,a02,a03),(a10,a11,a12,a13))
 	#ax[0][j].plot(np.repeat(hyper_seq[j,:],repeat),'b-')
 
 for i_group in range(n_group):
-	ax[0][0].errorbar(x_real[:,i_group],y_data[:,i_group],yerr = y_err[:,i_group],fmt='.')
+	#ax[0][0].errorbar(x_real[:,i_group],y_data[:,i_group],yerr = y_err[:,i_group],fmt='.')
+	ax[0][0].plot(x_real[:,i_group], y_data[:,i_group],'.')
 	ax[0][0].plot(x_real[:,i_group],model(x_real[:,i_group],(local_c0[i_group], local_c1[i_group])),'b-')
-ax[0][0].legend(['c0 %.1f' %hyper_c0, 'c1 %.1f' %hyper_c1, 'sig_c0 %.1f' %hyper_sigc0, 'sig_c1 %.1f' %hyper_sigc1],\
-loc=0)
+
 
 ax[0][1].plot(repeat_seq[:i_step],'b-')
 ax[0][1].set_xlabel('repeat times')
@@ -118,7 +133,7 @@ ax[1][2].set_xlabel('hyper_sigc1')
 ax[1][3].set_xlabel('hyper_sigc0')
 
 
-plt.savefig('plt_test_multiline_'+str(int(time.time()))+'.png')
+plt.savefig('plt_test_jagsdata.png')
 
 '''
 ### print to file

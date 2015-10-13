@@ -1,0 +1,16 @@
+n_step = 10000
+
+hyper_c1 = 3.
+hyper_c0 = 5.
+n_group = 10
+n_point = 20
+hyper_sigc1 = 1e0
+hyper_sigc0 = 1e0
+
+err_size = 2.
+
+hyper0 = 2.*np.array([hyper_c1,hyper_c0,hyper_sigc1,hyper_sigc0]) 
+hyper_step = np.array([5e-2,5e-2,1e-2,1e-2])
+
+draw_times=500, single_jump = False, trial_upbound = 2e6
+

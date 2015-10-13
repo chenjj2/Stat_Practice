@@ -107,19 +107,22 @@ def hbm_likelihood(hyper,draw_local_func,draw_times,n_group,log_likely_func,mode
 			local = draw_local_func(hyper)
 			loglike_each[i_draw,i_group] = log_likely_func(local, model, *data)
 
-	median = np.median(loglike_each,axis=0)
-	delta = loglike_each-median
-	mean_ratio_of_median = np.mean(np.exp(delta),axis=0)
+	if draw_times==1:
+		total_loglike = np.sum(loglike_each)
+	else:
+		maximum = np.max(loglike_each,axis=0)
+		delta = loglike_each-maximum
+		mean_ratio_of_maximum = np.mean(np.exp(delta),axis=0)
 	
-	loglikelihood = median + np.log(mean_ratio_of_median)
-	total_loglike = np.sum(loglikelihood)
+		loglikelihood = maximum + np.log(mean_ratio_of_maximum)
+		total_loglike = np.sum(loglikelihood)
 
 	return total_loglike
 
 
 ''' hbm with mcmc '''
 def hbm(hyper0, hyper_stepsize, n_step, draw_local_func, n_group, log_likely_func, model, \
-data=[], seed=2357, domain=[], draw_times=1, single_jump = False, trial_upbound = 100000):
+data=[], seed=2357, domain=[], draw_times=1, single_jump = False, trial_upbound = 1e5):
 
 	np.random.seed(seed)
 
