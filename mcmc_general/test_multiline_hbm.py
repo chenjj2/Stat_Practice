@@ -13,7 +13,7 @@ from mcmc import hbm
 
 
 ### input for mcmc
-n_step = 50
+n_step = 5000
 
 
 ### generate line
@@ -49,9 +49,9 @@ print 'hyper: c1 * x + c0', hyper_c1, hyper_c0, hyper_sigc1, hyper_sigc0
 log likelihood depends on the assumption of the data
 assuming y_data ~ N(y_real, y_err)
 '''
-def single_log_likely(para, model_func, x_real, y_data, y_err):
-	y_model = model_func(x_real,para)
-	return 0.-np.sum( (y_model - y_data)**2./(2.* y_err**2.) )
+def single_log_likely(para, model_func, i_group, x_real, y_data, y_err):
+	y_model = model_func(x_real[:,i_group],para)
+	return 0.-np.sum( (y_model - y_data[:,i_group])**2./(2.* y_err[:,i_group]**2.) )
 
 
 
@@ -63,6 +63,7 @@ def draw_local_func(hyper):
 	return local
 
 
+
 ### mcmc
 import time
 print 'start:', time.asctime()
@@ -70,12 +71,14 @@ print 'start:', time.asctime()
 
 n_hyper = 4 # hyper_c1, hyper_c0, hyper_sigc1, hyper_sigc0
 hyper0 = 2.*np.array([hyper_c1,hyper_c0,hyper_sigc1,hyper_sigc0]) 
-hyper_step = np.array([1e-1,1e-1,1e-1,1e-1]) # randomly selected step size
+hyper_step = np.array([5e-1,5e-1,1e-1,1e-1]) # randomly selected step size
+
 
 hyper_seq, loglike_seq, repeat_seq, i_step = \
 hbm(hyper0, hyper_step, n_step, draw_local_func, n_group, single_log_likely, model, \
 data=[x_real,y_data,y_err], seed=2357, domain=[[2,0,np.inf],[3,0,np.inf]], \
-draw_times=5000, single_jump = True, trial_upbound = 100 )
+draw_times=100, single_jump = False, trial_upbound = 1e5 )
+
 
 print 'end:', time.asctime()
 
@@ -118,7 +121,7 @@ ax[1][2].set_xlabel('hyper_sigc1')
 ax[1][3].set_xlabel('hyper_sigc0')
 
 
-plt.savefig('plt_test_multiline_'+str(int(time.time()))+'.png')
+plt.savefig('Figure/plt_test_multiline_hbm'+str(int(time.time()))+'.png')
 
 '''
 ### print to file

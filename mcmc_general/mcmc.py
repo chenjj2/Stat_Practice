@@ -29,7 +29,7 @@ def domain_pass(para, domain):
 
 
 ''' mcmc jump '''
-def jump(para_old, para_stepsize, single_jump):
+def jump(para_old, para_stepsize, single_jump=False):
 	n_para = len(para_old)
 	if single_jump:
 		ind_para = np.random.choice(n_para,1)
@@ -105,7 +105,7 @@ def hbm_likelihood(hyper,draw_local_func,draw_times,n_group,log_likely_func,mode
 	for i_group in range(n_group):
 		for i_draw in range(draw_times):
 			local = draw_local_func(hyper)
-			loglike_each[i_draw,i_group] = log_likely_func(local, model, *data)
+			loglike_each[i_draw,i_group] = log_likely_func(local, model, i_group, *data)
 
 	if draw_times==1:
 		total_loglike = np.sum(loglike_each)
@@ -168,6 +168,181 @@ data=[], seed=2357, domain=[], draw_times=1, single_jump = False, trial_upbound 
 			else: pass
 
 	return hyper_chain, loglike, repeat, i_step
+
+
+''' hbm_joint '''
+def hbm_joint(hyper0, hyper_stepsize, local0, local_stepsize, n_step, \
+			local_given_hyper, data_given_local, model, data=[], \
+			hyper_domain=[], local_domain=[],\
+			trial_upbound = 1e5, random_seed = 2357):
+
+	np.random.seed(random_seed)
+
+	### initial setup
+	n_hyper = len(hyper0)
+	hyper_chain = np.zeros((n_step,n_hyper))
+	hyper_chain[0,:] = hyper0
+
+	n_local = len(local0)
+	local_chain = np.zeros((n_step,n_local))
+	local_chain[0,:] = local0
+
+	loglikelihood_chain = np.repeat(-np.inf,n_step)
+	loglikelihood0 = local_given_hyper(hyper0, local0) + data_given_local(local0, model, *data)
+	loglikelihood_chain[0] = loglikelihood0
+
+	repeat_chain = np.zeros((n_step,), dtype=np.int)
+	repeat_chain[n_step-1] = 1
+
+	### first step
+	hyper_old = hyper0
+	local_old = local0
+	loglikelihood_old = loglikelihood0
+
+	### mcmc
+	for i_step in range(0, n_step-1):
+		if (np.sum(repeat_chain)>=trial_upbound):
+			break
+
+		step_stay = True
+		while step_stay & (np.sum(repeat_chain)<trial_upbound):
+			repeat_chain[i_step] = repeat_chain[i_step]+1
+
+			### jump
+			hyper_new = jump(hyper_old, hyper_stepsize)
+			local_new = jump(local_old, local_stepsize)
+
+			### domain check
+			if len(hyper_domain) != 0:
+				if not domain_pass(hyper_new, hyper_domain): 
+					continue
+
+			if len(local_domain) != 0:
+				if not domain_pass(local_new, local_domain): 
+					continue
+
+			### calculate loglikelihood
+			loglikelihood_new = local_given_hyper(hyper_new,local_new) + data_given_local(local_new, model, *data)
+
+			### accept/reject
+			ratio = np.exp(loglikelihood_new - loglikelihood_old)
+	
+			if (np.random.uniform(0,1) < ratio):
+				hyper_chain[i_step+1,:] = hyper_new
+				hyper_old = hyper_new + 0.
+
+				local_chain[i_step+1,:] = local_new
+				local_old = local_new + 0.
+
+				loglikelihood_chain[i_step+1] = loglikelihood_new
+				loglikelihood_old = loglikelihood_new + 0.
+
+				step_stay = False
+
+			else: pass
+
+	return hyper_chain, local_chain, loglikelihood_chain, repeat_chain, i_step
+
+
+''' jump in the probability space '''
+def jump_prob(para, stepsize, continuous=False):
+	
+	n_para = len(para)
+	para_new = para + stepsize * np.random.normal(0.,1., n_para)
+
+	if continuous:
+		para_new = para_new - np.floor(para_new)		
+	else:
+		out = (para_new>1.) | (para_new<0.)
+		para_new[out] = para[out] + 0.
+
+	return para_new 
+
+
+''' hbm_joint with jump in the probability space '''
+def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_step,\
+				inverse_hyper, inverse_local, \
+				data_given_local, model, data=[], \
+				trial_upbound = 1e5, random_seed = 2357):
+	
+	np.random.seed(random_seed)
+
+	### initial setup
+	n_hyper = len(hyper_prob0)
+	hyper_prob_chain = np.zeros((n_step, n_hyper))
+	hyper_chain = np.zeros((n_step, n_hyper))
+	hyper0 = inverse_hyper(hyper_prob0)
+	hyper_prob_chain[0] = hyper_prob0
+	hyper_chain[0] = hyper0
+
+	n_local = len(local_prob0)
+	local_prob_chain = np.zeros((n_step, n_local))
+	local_chain = np.zeros((n_step, n_local))
+	local0 = inverse_local(local_prob0, hyper0)
+	local_prob_chain[0] = local_prob0
+	local_chain[0] = local0
+
+	loglikelihood_chain = np.repeat(-np.inf, n_step)
+	loglikelihood0 = data_given_local(local0, model, *data)
+	loglikelihood_chain[0] = loglikelihood0
+
+	repeat_chain = np.zeros((n_step,), dtype=np.int)
+	repeat_chain[n_step-1] = 1
+
+	
+	### first step
+	hyper_prob_old, local_prob_old = hyper_prob0, local_prob0
+	hyper_old, local_old = hyper0, local0
+	loglikelihood_old = loglikelihood0
+
+	#print hyper_prob_old
+	#print hyper_old
+	#print loglikelihood_old
+
+	
+	### mcmc
+	for i_step in range(0, n_step-1):
+		if (np.sum(repeat_chain)>=trial_upbound):
+			break
+		
+		step_stay = True
+		while step_stay & (np.sum(repeat_chain)<trial_upbound):
+			repeat_chain[i_step] = repeat_chain[i_step]+1
+
+			## jump in prob-space, inverse cdf
+			hyper_prob_new = jump_prob(hyper_prob_old, hyper_stepsize)
+			local_prob_new = jump_prob(local_prob_old, local_stepsize)
+			hyper_new = inverse_hyper(hyper_prob_new)
+			local_new = inverse_local(local_prob_new, hyper_new)
+
+			loglikelihood_new = data_given_local(local_new, model, *data)
+
+			#print hyper_new
+			#print loglikelihood_new
+		
+			### accept/reject		
+			ratio = np.exp(loglikelihood_new - loglikelihood_old)
+
+			if (np.random.uniform(0,1)<ratio):
+				hyper_prob_chain[i_step+1,:] = hyper_prob_new
+				hyper_chain[i_step+1,:] = hyper_new
+				hyper_prob_old = hyper_prob_new + 0.
+				hyper_old = hyper_new + 0.
+
+				local_prob_chain[i_step+1, :] = local_prob_new
+				local_chain[i_step+1,:] = local_new
+				local_prob_old = local_prob_new + 0.
+				local_old =local_new +0.
+
+				loglikelihood_chain[i_step+1] = loglikelihood_new
+				loglikelihood_old = loglikelihood_new + 0.
+
+				step_stay = False
+
+			else: pass
+			
+	return hyper_prob_chain, hyper_chain, local_prob_chain, local_chain, \
+			loglikelihood_chain, repeat_chain, i_step
 
 
 
