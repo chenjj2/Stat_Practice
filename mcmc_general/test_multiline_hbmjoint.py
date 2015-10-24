@@ -20,7 +20,7 @@ np.random.seed(seed)
 hyper_c1 = 3.
 hyper_c0 = 5.
 n_group = 10
-n_point = 20
+n_point = 1
 hyper_sigc1 = 1e0
 hyper_sigc0 = 1e0
 
@@ -93,7 +93,7 @@ def inverse_local(local_prob, hyper):
 import time
 print 'start:', time.asctime()
 
-n_step = int(1e4)
+n_step = int(1e5)
 n_hyper = 4 # hyper_c1, hyper_c0, hyper_sigc1, hyper_sigc0
 
 '''
@@ -112,15 +112,15 @@ trial_upbound = 1e5, random_seed = seed)
 
 hyper_prob0 = np.array([0.3, 0.3, 0.8, 0.8])
 local_prob0 = 0.3 * np.ones(2*n_group)
-hyper_stepsize = 1e-3 * np.ones(n_hyper)
-local_stepsize = 1e-3 * np.ones(2*n_group)
+hyper_stepsize = 3e-3 * np.ones(n_hyper)
+local_stepsize = 3e-3 * np.ones(2*n_group)
 
 hyper_prob_chain, hyper_chain, local_prob_chain, local_chain, \
 loglikelihood_chain, repeat_chain, stop_step = \
 hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_step,\
 inverse_hyper, inverse_local, \
 data_given_local, model, data=[x_real, y_data, y_err], \
-trial_upbound = 1e5, random_seed = seed)
+trial_upbound = 1e6, random_seed = seed)
 
 
 
@@ -164,11 +164,3 @@ ax[1][3].set_xlabel('hyper_sigc0')
 
 
 plt.savefig('Figure/test_multiline_hbmjoint'+str(int(time.time()))+'.png')
-
-'''
-### print to file
-print 'stop_step', stop_step
-np.savetxt('hyper.out', hyper_chain, delimiter=',')
-np.savetxt('loglike.out', loglikelihood_chain)
-np.savetxt('repeat.out', repeat_chain)
-'''

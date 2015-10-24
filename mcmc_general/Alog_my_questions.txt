@@ -1,0 +1,16 @@
+Assumption: exoplanets belongs to the same category -- rocky planets
+But: what about their differences?
+1. different host -> original chemical abundance
+2. planet evolution -> volatile depletion(temperature<-distance?), stellar wind
+3. age of the system -> evolution stage
+4. outlier -> e.g. Mecury(possibly hit by something)
+
+Data Selection: how do we choose our sample <- why do we believe that they can be categorize into 1 group
+
+Method: can HBM break the inherent degeneracy of the problem?
+
+Practice: 
+1. input grid alpha(iron fraction), beta(silicate fraction), gamma(h2o fraction), mass. constraint: alpha+beta+gamma=1. output radius 
+2. bylinear interpolation on mass
+
+

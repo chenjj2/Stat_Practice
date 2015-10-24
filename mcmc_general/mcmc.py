@@ -172,7 +172,7 @@ data=[], seed=2357, domain=[], draw_times=1, single_jump = False, trial_upbound 
 
 ''' hbm_joint '''
 def hbm_joint(hyper0, hyper_stepsize, local0, local_stepsize, n_step, \
-			local_given_hyper, data_given_local, model, data=[], \
+			hyper_prior, local_given_hyper, data_given_local, data=[], \
 			hyper_domain=[], local_domain=[],\
 			trial_upbound = 1e5, random_seed = 2357):
 
@@ -188,7 +188,7 @@ def hbm_joint(hyper0, hyper_stepsize, local0, local_stepsize, n_step, \
 	local_chain[0,:] = local0
 
 	loglikelihood_chain = np.repeat(-np.inf,n_step)
-	loglikelihood0 = local_given_hyper(hyper0, local0) + data_given_local(local0, model, *data)
+	loglikelihood0 = hyper_prior(hyper0) + local_given_hyper(hyper0, local0) + data_given_local(local0, *data)
 	loglikelihood_chain[0] = loglikelihood0
 
 	repeat_chain = np.zeros((n_step,), dtype=np.int)
@@ -209,17 +209,9 @@ def hbm_joint(hyper0, hyper_stepsize, local0, local_stepsize, n_step, \
 			repeat_chain[i_step] = repeat_chain[i_step]+1
 
 			### jump
-			hyper_new = jump(hyper_old, hyper_stepsize)
-			local_new = jump(local_old, local_stepsize)
+			hyper_new = jump(hyper_old, hyper_stepsize, hyper_domain)
+			local_new = jump(local_old, local_stepsize, local_domain)
 
-			### domain check
-			if len(hyper_domain) != 0:
-				if not domain_pass(hyper_new, hyper_domain): 
-					continue
-
-			if len(local_domain) != 0:
-				if not domain_pass(local_new, local_domain): 
-					continue
 
 			### calculate loglikelihood
 			loglikelihood_new = local_given_hyper(hyper_new,local_new) + data_given_local(local_new, model, *data)
@@ -283,7 +275,9 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 	local_chain[0] = local0
 
 	loglikelihood_chain = np.repeat(-np.inf, n_step)
-	loglikelihood0 = data_given_local(local0, model, *data)
+	# FIXME
+	loglikelihood0 = data_given_local(local0, model, *data) + np.sum(np.log(local_prob0))
+	# ENDFIXME
 	loglikelihood_chain[0] = loglikelihood0
 
 	repeat_chain = np.zeros((n_step,), dtype=np.int)
@@ -295,10 +289,6 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 	hyper_old, local_old = hyper0, local0
 	loglikelihood_old = loglikelihood0
 
-	#print hyper_prob_old
-	#print hyper_old
-	#print loglikelihood_old
-
 	
 	### mcmc
 	for i_step in range(0, n_step-1):
@@ -309,17 +299,22 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 		while step_stay & (np.sum(repeat_chain)<trial_upbound):
 			repeat_chain[i_step] = repeat_chain[i_step]+1
 
+			'''## adaptive stepsize
+			if repeat_chain[i_step] > 100: 
+				hyper_stepsize = hyper_stepsize * 0.5
+				local_stepsize = local_stepsize * 0.5
+			'''
+
 			## jump in prob-space, inverse cdf
 			hyper_prob_new = jump_prob(hyper_prob_old, hyper_stepsize)
 			local_prob_new = jump_prob(local_prob_old, local_stepsize)
 			hyper_new = inverse_hyper(hyper_prob_new)
 			local_new = inverse_local(local_prob_new, hyper_new)
 
-			loglikelihood_new = data_given_local(local_new, model, *data)
-
-			#print hyper_new
-			#print loglikelihood_new
-		
+			# FIXME
+			loglikelihood_new = data_given_local(local_new, model, *data) + np.sum(np.log(local_prob_new))
+			# ENDFIXME
+	
 			### accept/reject		
 			ratio = np.exp(loglikelihood_new - loglikelihood_old)
 
@@ -341,6 +336,7 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 
 			else: pass
 			
+	print 'final size:', hyper_stepsize[0]
 	return hyper_prob_chain, hyper_chain, local_prob_chain, local_chain, \
 			loglikelihood_chain, repeat_chain, i_step
 

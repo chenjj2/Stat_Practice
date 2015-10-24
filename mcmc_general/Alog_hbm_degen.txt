@@ -1,0 +1,12 @@
+Does HBM with a bunch of data break the degeneracy?
+-----------
+Problem: With Mass and Radius measurements from some exoplanets, can we use HBM to infer the fraction of iron, silicate, and water, from a 3-layer model.
+-----------
+Test:
+Given A,B,C
+Draw (a,b,c)s from A,B,C
+Calculate y1=8a+3b+c and y2=a+b+c
+Now, given (y1,y2)s
+Can we find A,B,C?
+
+
