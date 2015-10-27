@@ -44,7 +44,7 @@ for i in range(n_group):
 log likelihood depends on the assumption of the data
 assuming y_data ~ N(y_real, y_err)
 '''
-def data_given_local(local, model, x_real, y_data, y_err):
+def data_given_local(local, x_real, y_data, y_err):
 	n_group = len(local)/2
 	local_c1 = local[:n_group]
 	local_c0 = local[n_group:]
@@ -55,7 +55,6 @@ def data_given_local(local, model, x_real, y_data, y_err):
 		loglikelihood = 0. - np.sum( (y_model - y_data[:,i_group])**2. / (2.*y_err[:,i_group]**2.) )
 		total_loglikelihood = total_loglikelihood + loglikelihood
 	
-
 	return total_loglikelihood
 
 
@@ -66,13 +65,30 @@ def local_given_hyper(hyper, local):
 	local_c1 = local[:n_group]
 	local_c0 = local[n_group:]
 
-	total_loglikelihood = n_group * ( np.log(hyper_sigc1) + np.log(hyper_sigc0) ) \
+	total_loglikelihood = 0.- n_group * ( np.log(hyper_sigc1) + np.log(hyper_sigc0) ) \
 	- np.sum( (local_c1-hyper_c1)**2. / (2.*hyper_sigc1**2.) ) \
 	- np.sum( (local_c0-hyper_c0)**2. / (2.*hyper_sigc0**2.) )
 
 	return total_loglikelihood
 
+
+def hyper_prior(hyper):
+	return 0.
+
+
+''' domain check '''
+def hyper_domain(hyper_tmp, hyper_old):
+	hyper_new = hyper_tmp + 0.
+	if hyper_tmp[2] <= 0.:
+		hyper_new[2] = hyper_old[2] + 0.
+	if hyper_tmp[3] <= 0.:
+		hyper_new[3] = hyper_old[3] + 0.
+	
+	return hyper_new
+
+
 ''' inverse cdf '''
+'''
 def inverse_hyper(hyper_prob):
 	pr_c1, pr_c0, pr_sigc1, pr_sigc0 = hyper_prob
 
@@ -88,6 +104,8 @@ def inverse_local(local_prob, hyper):
 	c0 = norm.ppf(local_prob[n_group:], hyper[1], hyper[3] )
 	local = np.hstack((c1, c0))
 	return local
+'''
+
 
 ### mcmc
 import time
@@ -96,20 +114,20 @@ print 'start:', time.asctime()
 n_step = int(1e5)
 n_hyper = 4 # hyper_c1, hyper_c0, hyper_sigc1, hyper_sigc0
 
-'''
+
 hyper0 =  np.array([ 2.*hyper_c1, 2.*hyper_c0, hyper_sigc1, hyper_sigc0]) 
 local0 =  2.*np.hstack((local_c1,local_c0))
-hyper_stepsize = np.array([3e-2, 3e-2, 3e-2, 3e-2])
-local_stepsize = 3e-2 * np.ones(2*n_group)
+hyper_stepsize = np.array([1e-1, 1e-1, 1e-1, 1e-1])
+local_stepsize = 1e-1 * np.ones(2*n_group)
 
-hyper_chain, local_chain, loglikelihood_chain, repeat_chain, stop_step= \
+hyper_chain, local_chain, loglikelihood_chain, repeat_chain, stop_step = \
 hbm_joint(hyper0, hyper_stepsize, local0, local_stepsize, n_step, \
-local_given_hyper, data_given_local, model, data=[x_real,y_data,y_err], \
-hyper_domain=[[2,0,np.inf],[3,0,np.inf]], \
-trial_upbound = 1e5, random_seed = seed)
+hyper_prior, local_given_hyper, data_given_local, data=[x_real,y_data,y_err], \
+hyper_domain=hyper_domain, local_domain = None, \
+trial_upbound = 1e6, random_seed = seed)
+
+
 '''
-
-
 hyper_prob0 = np.array([0.3, 0.3, 0.8, 0.8])
 local_prob0 = 0.3 * np.ones(2*n_group)
 hyper_stepsize = 3e-3 * np.ones(n_hyper)
@@ -121,7 +139,7 @@ hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_step,\
 inverse_hyper, inverse_local, \
 data_given_local, model, data=[x_real, y_data, y_err], \
 trial_upbound = 1e6, random_seed = seed)
-
+'''
 
 
 print 'end:', time.asctime()
@@ -149,12 +167,12 @@ ratio[np.where(ratio>1)[0]] = 1
 ax[0][2].plot(ratio[:stop_step-1], 'b-')
 ax[0][2].set_xlabel('ratio')
 
-ax[0][3].plot(loglikelihood_chain[:stop_step],'b-')
+ax[0][3].plot(range(stop_step/2,stop_step), loglikelihood_chain[stop_step/2:stop_step],'b-')
 ax[0][3].set_xlabel('loglikelihood')
 
 
 for j in range(col):
-	ax[1][j].plot(hyper_chain[:stop_step, j],'b-')
+	ax[1][j].plot(range(stop_step/2,stop_step), hyper_chain[stop_step/2:stop_step, j],'b-')
 
 
 ax[1][0].set_xlabel('hyper_c1')

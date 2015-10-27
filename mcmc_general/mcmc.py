@@ -41,14 +41,14 @@ def jump(para_old, para_stepsize, single_jump=False):
 
 
 ''' mcmc '''
-def mcmc(p0, p_step, n_step, log_likely_func, data=[], seed=2357, *check_func):
+def mcmc(p0, p_step, n_step, log_likely_func, data=[], domain = None, seed=2357, *check_func):
 	# set random seed
 	np.random.seed(seed)
 
 	# setup parameter chain
 	n_para = len(p0)
-	p_seq = np.zeros((n_para, n_step))
-	p_seq[:,0] = p0
+	p_seq = np.zeros((n_step, n_para))
+	p_seq[0,:] = p0
 
 	# setup check function (eg. chi2), otherwise return log likelihood
 	if check_func:
@@ -57,13 +57,16 @@ def mcmc(p0, p_step, n_step, log_likely_func, data=[], seed=2357, *check_func):
 		check = log_likely_func
 
 	check_seq = np.zeros(n_step)
-	check_seq[0] = check(p_seq[:,0],*data)
+	check_seq[0] = check(p_seq[0,:],*data)
 
 	# advance with p_step and check if accept p_new
 	for i_step in range(1,n_step):
 
-		p_old = p_seq[:, i_step-1]+0.
+		p_old = p_seq[i_step-1, :] + 0.
 		p_new = p_old + p_step * np.random.uniform(-1,1,n_para)
+		if domain != None:
+			p_new = domain(p_new, p_old)
+		else: pass
 
 		delta_log = log_likely_func(p_new, *data) - \
 					log_likely_func(p_old, *data)
@@ -72,11 +75,11 @@ def mcmc(p0, p_step, n_step, log_likely_func, data=[], seed=2357, *check_func):
 
 		ratio = np.exp(delta_log)
 		if (np.random.uniform(0,1) < ratio):
-			p_seq[:,i_step] = p_new
+			p_seq[i_step, :] = p_new
 		else:
-			p_seq[:,i_step] = p_old
+			p_seq[i_step, :] = p_old
 
-		check_seq[i_step] = check(p_seq[:,i_step],*data)
+		check_seq[i_step] = check(p_seq[i_step, :],*data)
 
 	return p_seq, check_seq
 
@@ -170,10 +173,20 @@ data=[], seed=2357, domain=[], draw_times=1, single_jump = False, trial_upbound 
 	return hyper_chain, loglike, repeat, i_step
 
 
+''' hbm_jump '''
+# copy from jump, I am no more using func_mcmc or func_hbm anyway
+def hbm_jump(para_old, para_stepsize):
+	n_para = len(para_old)
+	
+	para_new = para_old + para_stepsize * np.random.normal(0.,1.,n_para)
+
+	return para_new
+
+
 ''' hbm_joint '''
 def hbm_joint(hyper0, hyper_stepsize, local0, local_stepsize, n_step, \
 			hyper_prior, local_given_hyper, data_given_local, data=[], \
-			hyper_domain=[], local_domain=[],\
+			hyper_domain=None, local_domain=None,\
 			trial_upbound = 1e5, random_seed = 2357):
 
 	np.random.seed(random_seed)
@@ -209,12 +222,19 @@ def hbm_joint(hyper0, hyper_stepsize, local0, local_stepsize, n_step, \
 			repeat_chain[i_step] = repeat_chain[i_step]+1
 
 			### jump
-			hyper_new = jump(hyper_old, hyper_stepsize, hyper_domain)
-			local_new = jump(local_old, local_stepsize, local_domain)
+			hyper_new = jump(hyper_old, hyper_stepsize)
+			local_new = jump(local_old, local_stepsize)
+
+			if hyper_domain == None: pass
+			else:
+				hyper_new = hyper_domain(hyper_new, hyper_old)
+			if local_domain == None: pass
+			else:
+				local_new = local_domain(local_new, local_old)
 
 
 			### calculate loglikelihood
-			loglikelihood_new = local_given_hyper(hyper_new,local_new) + data_given_local(local_new, model, *data)
+			loglikelihood_new = hyper_prior(hyper_new) + local_given_hyper(hyper_new,local_new) + data_given_local(local_new, *data)
 
 			### accept/reject
 			ratio = np.exp(loglikelihood_new - loglikelihood_old)
@@ -254,7 +274,7 @@ def jump_prob(para, stepsize, continuous=False):
 ''' hbm_joint with jump in the probability space '''
 def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_step,\
 				inverse_hyper, inverse_local, \
-				data_given_local, model, data=[], \
+				loglike_func, data, \
 				trial_upbound = 1e5, random_seed = 2357):
 	
 	np.random.seed(random_seed)
@@ -276,7 +296,8 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 
 	loglikelihood_chain = np.repeat(-np.inf, n_step)
 	# FIXME
-	loglikelihood0 = data_given_local(local0, model, *data) + np.sum(np.log(local_prob0))
+	#loglikelihood0 = data_given_local(local0, model, *data) + np.sum(np.log(local_prob0))
+	loglikelihood0 = loglike_func(hyper0, local0, *data)
 	# ENDFIXME
 	loglikelihood_chain[0] = loglikelihood0
 
@@ -299,12 +320,6 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 		while step_stay & (np.sum(repeat_chain)<trial_upbound):
 			repeat_chain[i_step] = repeat_chain[i_step]+1
 
-			'''## adaptive stepsize
-			if repeat_chain[i_step] > 100: 
-				hyper_stepsize = hyper_stepsize * 0.5
-				local_stepsize = local_stepsize * 0.5
-			'''
-
 			## jump in prob-space, inverse cdf
 			hyper_prob_new = jump_prob(hyper_prob_old, hyper_stepsize)
 			local_prob_new = jump_prob(local_prob_old, local_stepsize)
@@ -312,7 +327,8 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 			local_new = inverse_local(local_prob_new, hyper_new)
 
 			# FIXME
-			loglikelihood_new = data_given_local(local_new, model, *data) + np.sum(np.log(local_prob_new))
+			#loglikelihood_new = data_given_local(local_new, model, *data) + np.sum(np.log(local_prob_new))
+			loglikelihood_new = loglike_func(hyper_new, local_new, *data)
 			# ENDFIXME
 	
 			### accept/reject		
@@ -336,7 +352,6 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 
 			else: pass
 			
-	print 'final size:', hyper_stepsize[0]
 	return hyper_prob_chain, hyper_chain, local_prob_chain, local_chain, \
 			loglikelihood_chain, repeat_chain, i_step
 
