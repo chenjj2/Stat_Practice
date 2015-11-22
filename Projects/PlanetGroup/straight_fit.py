@@ -19,14 +19,16 @@ n_pop = 4
 file = 'PlanetGroup.txt'
 dat = np.loadtxt(file)
 m_exact = (dat[:,1]==0.)
-dat_fixm = convert_data(dat[m_exact]) # 23 objects
+dat_fixm = convert_data(dat[m_exact]) 
 M0 = dat_fixm[:,0]
-dat_varm = convert_data(dat[~m_exact]) # 265 objects
+dat_varm = convert_data(dat[~m_exact]) 
 
 
 ### some static parameter 
-n_fixm = 23
-n_varm = 265
+n_fixm = np.shape(dat_fixm)[0]
+n_varm = np.shape(dat_varm)[0]
+m_max = np.max(np.hstack((dat_fixm[:,0], dat_varm[:,0])))
+m_min = np.min(np.hstack((dat_fixm[:,0], dat_varm[:,0])))
 
 
 ### inverse sampling
@@ -36,8 +38,8 @@ def inverse_hyper(hyper_prob):
 	
 	C0 = uniform.ppf(prob_C0,-1.,2.)
 	slope = norm.ppf(prob_slope, 0.,5.)
-	sigma = 10.**( uniform.ppf(prob_sigma, -3., 5.) )
-	trans = np.sort( uniform.ppf(prob_trans, -4., 10.) ) # sort
+	sigma = 10.**( uniform.ppf(prob_sigma, -3., 3.) )
+	trans = np.sort( uniform.ppf(prob_trans, m_min, m_max-m_min) ) # sort
 
 	hyper = np.hstack(( C0, slope, sigma, trans ))
 
@@ -108,11 +110,14 @@ def loglike_func(hyper,local, dat_fixm, dat_varm):
 
 ### mcmc
 
-n_step = int(5e5)
+n_step = int(5e6)
 
-hyper_prob0 = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.65, 0.8])
+### FIXTHIS
+#hyper_prob0 = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.65, 0.8])
+### ENDFIX
 hyper_stepsize = 1e-4 * np.ones(3*n_pop)
-local_prob0 = 0.5 * np.ones(n_fixm + 2*n_varm)
+#local_prob0 = 0.5 * np.ones(n_fixm + 2*n_varm)
+local_prob0 = np.random.uniform(0.,1., n_fixm + 2*n_varm)
 local_stepsize = 1e-4 * np.ones(n_fixm + 2*n_varm)
 
 import time
@@ -123,7 +128,7 @@ loglike_chain, repeat_chain, stop_step = \
 hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_step,\
 			inverse_hyper, inverse_local, \
 			loglike_func, data = [dat_fixm, dat_varm], \
-			trial_upbound = 10*n_step)
+			trial_upbound = 100*n_step)
 
 print 'end', time.asctime()
 print 'stop', stop_step

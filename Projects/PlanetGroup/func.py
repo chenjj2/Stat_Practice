@@ -60,7 +60,7 @@ def convert_data(dat):
 	rad = dat[:,2].reshape(nrow,1)
 	raderr = dat[:,3].reshape(nrow,1)
 
-	log_dat = np.hstack(( np.log10(mass), merr/mass, np.log10(rad), raderr/rad ))
+	log_dat = np.hstack(( np.log10(mass), np.log10(np.e) * merr/mass, np.log10(rad), np.log10(np.e) * raderr/rad ))
 
 	return log_dat
 

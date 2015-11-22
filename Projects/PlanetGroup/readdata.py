@@ -31,6 +31,19 @@ mearth2kg = 5.9726e24
 rearth2km = 6371.0
 
 
+### select almost gaussian error
+def select_gaussian(err):
+	up = err[:,0]
+	down = err[:,1]
+
+	mean_err = (up+down)/2.
+	diff = np.abs(up-down) / mean_err
+	
+	ind = diff<0.1
+	
+	return ind, mean_err.reshape(len(up),1)
+
+
 ### read 
 # format: M (ME), Merr, R (RE), Rerr
 i=0
@@ -61,18 +74,25 @@ d3_r = d3[:, 2:4]
 d3 = np.hstack(( d3_m * msun2mearth, d3_r * rsun2rearth ))
 i +=1
 
-print dir+file[i]
 d4 = np.loadtxt(dir+file[i], skiprows=1, usecols=(1,2,3,4,5,6),delimiter=',')
-rowind = (d4[:,1]==d4[:,2]) & (d4[:,4]==d4[:,5]) # symmetric error
+mind4, merr4 = select_gaussian(d4[:,1:3]) # error
+rind4, rerr4 = select_gaussian(d4[:,4:6]) 
+rowind = mind4 & rind4
 d4_m = d4[rowind, 0:2]
+d4_m[:,1] = merr4[rowind,0]
 d4_r = d4[rowind, 3:5]
+d4_r[:,1] = rerr4[rowind,0]
 d4 = np.hstack(( d4_m * mjup2mearth, d4_r * rjup2rearth ))
 i +=1
 
 d5 = np.loadtxt(dir+file[i], skiprows=1, usecols=(1,2,3,4,5,6), delimiter=',')
-rowind = (d5[:,1]==d5[:,2]) & (d5[:,4]==d5[:,5]) # symmetric error
+mind5, merr5 = select_gaussian(d5[:,1:3]) # error
+rind5, rerr5 = select_gaussian(d5[:,4:6])
+rowind = mind5 & rind5 
 d5_m = d5[rowind, 0:2]
+d5_m[:,1] = merr5[rowind,0]
 d5_r = d5[rowind, 3:5]
+d5_r[:,1] = rerr5[rowind,0]
 d5 = np.hstack(( d5_m * msun2mearth, d5_r * rsun2rearth ))
 i +=1
 
@@ -85,9 +105,13 @@ d6 = np.hstack(( d6_m, err, d6_r, err ))
 i +=1
 
 d7 = np.loadtxt(dir+file[i], skiprows=1, usecols=(26,27,28,29,30,31),delimiter=',')
-rowind = (d7[:,1]==d7[:,2]) & (d7[:,4]==d7[:,5]) # symmetric error
+mind7, merr7 = select_gaussian(d7[:,1:3]) # error
+rind7, rerr7 = select_gaussian(d7[:,4:6])
+rowind = mind7 & rind7 
 d7_m = d7[rowind, 0:2]
+d7_m[:,1] = merr7[rowind,0]
 d7_r = d7[rowind, 3:5]
+d7_r[:,1] = rerr7[rowind,0]
 d7 = np.hstack(( d7_m * mjup2mearth, d7_r * rjup2rearth ))
 i +=1
 
@@ -108,29 +132,38 @@ d9 = np.hstack(( d9_m, err, d9_r, err ))
 
 ### combine data
 #dat_list = [d0,d1,d2,d3,d4,d5,d6,d7,d8,d9]
-dat = np.vstack(( d0,d1,d3,d4,d5,d6,d7,d8,d9 ))
+whole_dat = np.vstack(( d0,d1,d3,d4,d5,d6,d7,d8,d9 ))
 
+dpl = np.vstack(( d6, d8 ))
+pl = np.vstack(( d7, d9 ))
+bd = d4
+st = np.vstack(( d0, d1, d3, d5 ))
 
 ### select
-# valid data
-ind = (dat[:,0]>0.) & (dat[:,1]>=0.) & (dat[:,2]>0.) & (dat[:,3]>=0.)
-# 3 sigma cut
-ind = ind & (dat[:,0]/dat[:,1] > 3.) & (dat[:,2]/dat[:,3] > 3.)
-# mass range
-max_mass = 2.9e5 # less than universe age
-min_mass = 5.7e-5 # wiki dwarf planet, the transition to hydrostatic equilibrium
-ind = ind & (dat[:,0] > min_mass) & (dat[:,0] < max_mass)
+def select(dat):
+	# valid data
+	ind = (dat[:,0]>0.) & (dat[:,1]>=0.) & (dat[:,2]>0.) & (dat[:,3]>=0.)
+	# 3 sigma cut
+	ind = ind & (dat[:,0]/dat[:,1] > 3.) & (dat[:,2]/dat[:,3] > 3.)
+	# mass range
+	max_mass = 2.9e5 # less than universe age
+	min_mass = 5.7e-5 # wiki dwarf planet, the transition to hydrostatic equilibrium
+	ind = ind & (dat[:,0] > min_mass) & (dat[:,0] < max_mass)
 
-dat = dat[ind,:]
+	dat = dat[ind,:]
+	return dat
 
 ### pass data
 def data():
-	return dat
+	return select(whole_dat)
+
+def multi_data():
+	return select(dpl), select(pl), select(bd), select(st)
 
 
 ### examine data
 def plot():
-	plt.errorbar(dat[:,0], dat[:,2], xerr=dat[:,1], yerr=dat[:,3], fmt='.')
+	plt.errorbar(whole_dat[:,0], whole_dat[:,2], xerr=whole_dat[:,1], yerr=whole_dat[:,3], fmt='.')
 	plt.xscale('log'); plt.yscale('log')
 	plt.xlabel(r'M [M$_\oplus$]'); plt.ylabel(r'R [R$_\oplus$]')
 	plt.savefig('MR_data.png')
@@ -139,13 +172,20 @@ def plot():
 
 ### save data
 def save():
-	np.savetxt(dir+'Mine/PlanetGroup.txt',dat)
+	np.savetxt(dir+'Mine/PlanetGroup.txt', whole_dat)
+	return 0
+
+### save multi
+def save_multi():
+	np.savetxt(dir+'Mine/dpl.txt', select(dpl))
+	np.savetxt(dir+'Mine/pl.txt', select(pl))
+	np.savetxt(dir+'Mine/bd.txt', select(bd))
+	np.savetxt(dir+'Mine/st.txt', select(st))
 	return 0
 
 
 ### main
 if __name__ == '__main__':
-	plot()
-	save()
+	save_multi()
 
 

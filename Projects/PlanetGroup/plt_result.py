@@ -7,7 +7,6 @@ from func import indicate, convert_data,\
 
 
 ### color order: blue, green, red, cyan
-dir = '/Users/jingjing/Work/DK_project/Output/OutFile/PlanetGroup/'
 
 def plt_power():
 	### data
@@ -89,11 +88,11 @@ def plt_power():
 
 	return None
 
-def plt_linear():
+def plt_linear(dir,lin, temperature):
 	### data
-	hyper = np.loadtxt(dir+'str_hyper.out')
-	loglike = np.loadtxt(dir+'str_loglike.out')
-	repeat = np.loadtxt(dir+'str_repeat.out')
+	hyper = np.loadtxt(dir+'str_hyper_'+temperature+'.out')
+	loglike = np.loadtxt(dir+'str_loglike_'+temperature+'.out')
+	repeat = np.loadtxt(dir+'str_repeat_'+temperature+'.out')
 
 	### split data
 	c0 = hyper[:,0]
@@ -119,9 +118,13 @@ def plt_linear():
 	ax[0][1].plot(loglike)
 	ax[0][1].set_xlabel('L')
 
+	# loglike
+	ax[0][2].plot(range(len(loglike)/3*2, len(loglike)), loglike[len(loglike)/3*2:])
+	ax[0][1].set_xlabel('L')
+
 	# over plot
 	dat = convert_data(data())
-	ax[0][2].errorbar(dat[:,0], dat[:,2], xerr=dat[:,1], yerr=dat[:,3], fmt='.')
+	ax[0][3].errorbar(dat[:,0], dat[:,2], xerr=dat[:,1], yerr=dat[:,3], fmt='.')
 
 	hyper_last = hyper[-1,:]
 	trans_last = hyper_last[-3:]
@@ -129,19 +132,19 @@ def plt_linear():
 	r_sample = piece_linear(hyper_last, m_sample, prob_R = 0.5 * np.ones_like(m_sample))
 	r_upper = piece_linear(hyper_last, m_sample, prob_R = 0.84 * np.ones_like(m_sample))
 	r_lower = piece_linear(hyper_last, m_sample, prob_R = 0.16 * np.ones_like(m_sample))
-	ax[0][2].plot(m_sample,r_sample,'r-')
-	ax[0][2].fill_between(m_sample, r_lower, r_upper, color='grey', alpha=0.2)
+	ax[0][3].plot(m_sample,r_sample,'r-')
+	ax[0][3].fill_between(m_sample, r_lower, r_upper, color='grey', alpha=0.2)
 
 	r_trans = piece_linear(hyper_last, trans_last, prob_R = 0.5 * np.ones_like(trans_last))
-	ax[0][2].plot(trans_last, r_trans, 'rx')
+	ax[0][3].plot(trans_last, r_trans, 'rx')
 	
-	ax[0][2].set_xlabel(r'log10(M [M$_\oplus$])')
-	ax[0][2].set_ylabel(r'log10(R [R$_\oplus$])')
+	ax[0][3].set_xlabel(r'log10(M [M$_\oplus$])')
+	ax[0][3].set_ylabel(r'log10(R [R$_\oplus$])')
 
 	# C
 	ax[1][0].plot(c0)
 	ax[1][0].set_xlabel('c0')
-	ax[1][0].set_ylim([-3,3])
+	ax[1][0].set_ylim([-1,1])
 
 	# slope
 	for i in range(4):
@@ -153,7 +156,7 @@ def plt_linear():
 		ax[1][2].plot(sigma[:,i])
 	ax[1][2].set_yscale('log')
 	ax[1][2].set_xlabel('sigma')
-	ax[1][2].set_ylim([1e-3,1e2])
+	ax[1][2].set_ylim([1e-3,1e0])
 
 	# transition
 	for i in range(3):
@@ -161,10 +164,19 @@ def plt_linear():
 	ax[1][3].set_xlabel('transition')
 	ax[1][3].set_ylim([-4,6])
 
-	plt.savefig('plt_linear.png')
+	plt.savefig('lin_plot/'+lin+'_t'+temperature+'.png')
 
 	return None
 
 if __name__ == '__main__':
-	plt_power()
-	plt_linear()
+	#plt_power()
+	import argparse
+	parser = argparse.ArgumentParser()
+	parser.add_argument("temperature")
+	parser.add_argument("lin")
+	args = parser.parse_args()
+
+	lin = 'lin'+args.lin
+	temperature = args.temperature
+	dir = '/Users/jingjing/Work/DK_project/Output/OutFile/PlanetGroup/'+lin+'/'
+	plt_linear(dir,lin, temperature)
