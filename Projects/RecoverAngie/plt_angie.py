@@ -6,8 +6,8 @@ datafile = '/Users/jingjing/Work/DK_project/Stat_Practice/Projects/RecoverAngie/
 
 data = np.loadtxt(datafile)
 n_data = int(5e5)
-data_burnout = data[n_data/2:,:]
-data_thin = data_burnout[0::25,:]
+data_burnout = data[n_data/3*2:,:]
+data_thin = data_burnout[0::20,:]
 data_rearange = np.transpose(np.vstack((data_thin[:,1],data_thin[:,0],data_thin[:,2])))
 #c, gamma, sm = data[:,0], data[:,1], data[:,2]
 

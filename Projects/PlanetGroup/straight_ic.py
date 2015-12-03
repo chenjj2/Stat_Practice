@@ -11,10 +11,16 @@ from NaiveMC.mcmc import hbm_joint_cdf
 from scipy.stats import norm, uniform
 from func import indicate, split_hyper_linear, piece_linear, convert_data
 
+### seed
+import os
+pid = os.getpid()
+np.random.seed(pid)
+
 ### parse
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--temperature", type=float)
+parser.add_argument("--stepscale", type=float)
 parser.add_argument("--lindir")
 args = parser.parse_args()
 
@@ -22,6 +28,10 @@ if args.temperature:
 	temperature = args.temperature
 else:
 	temperature = 1.
+if args.stepscale:
+	stepscale = args.stepscale
+else:
+	stepscale = 1.
 if args.lindir:
 	lindir = args.lindir
 else:
@@ -54,8 +64,9 @@ def inverse_hyper(hyper_prob):
 	
 	C0 = uniform.ppf(prob_C0,-1.,2.)
 	slope = norm.ppf(prob_slope, 0.,5.)
-	sigma = 10.**( uniform.ppf(prob_sigma, -3., 3.) )
-	trans = np.sort( uniform.ppf(prob_trans, m_min, m_max-m_min) ) # sort
+	sigma = 10.**( uniform.ppf(prob_sigma, -3., 5.) )
+	#trans = np.sort( uniform.ppf(prob_trans, m_min, m_max-m_min) ) # sort
+	trans = np.sort( uniform.ppf(prob_trans, -4., 10.) )
 
 	hyper = np.hstack(( C0, slope, sigma, trans ))
 
@@ -127,14 +138,18 @@ def loglike_func(hyper,local, dat_fixm, dat_varm):
 ### mcmc
 
 n_step = int(5e5)
+stepsize = 1e-4
 
-hyper_prob0 = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.65, 0.8])
-hyper_stepsize = 1e-3 * np.ones(3*n_pop)
+# best likelihood hyper prob from straight.png
+hyper_prob0 = np.array([0.51810542,  0.52337062,  0.55452346,  0.49576571,  0.5724734 ,
+        0.31580759,  0.43485169,  0.35042435,  0.32092081,  0.46163857,
+        0.59956497,  0.84344558])
+hyper_stepsize = (stepsize*stepscale) * np.ones(3*n_pop)
 local_prob0 = 0.5 * np.ones(n_fixm + 2*n_varm)
-local_stepsize = 1e-3 * np.ones(n_fixm + 2*n_varm)
+local_stepsize = (stepsize*stepscale) * np.ones(n_fixm + 2*n_varm)
 
 import time
-#print 'start:', time.asctime()
+print 'start:', time.asctime()
 
 hyper_prob_chain, hyper_chain, local_prob_chain, local_chain, \
 loglike_chain, repeat_chain, stop_step = \
@@ -143,13 +158,16 @@ hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_step,\
 			loglike_func, data = [dat_fixm, dat_varm], \
 			trial_upbound = 10*n_step)
 
-#print 'end', time.asctime()
+print 'end', time.asctime()
 #print 'stop', stop_step
 
-### plot
-np.savetxt(lindir+'/str_hyper_prob_'+str(int(temperature))+'.out',hyper_prob_chain[:stop_step,:])
-np.savetxt(lindir+'/str_hyper_'+str(int(temperature))+'.out',hyper_chain[:stop_step,:])
-np.savetxt(lindir+'/str_loglike_'+str(int(temperature))+'.out',loglike_chain[:stop_step])
-np.savetxt(lindir+'/str_repeat_'+str(int(temperature))+'.out',repeat_chain[:stop_step])
+### save
+np.savetxt(lindir+'/t'+str(int(temperature))+'_s'+str(int(stepscale))+'_hyper_prob.out',hyper_prob_chain[:stop_step,:])
+np.savetxt(lindir+'/t'+str(int(temperature))+'_s'+str(int(stepscale))+'_hyper.out',hyper_chain[:stop_step,:])
+np.savetxt(lindir+'/t'+str(int(temperature))+'_s'+str(int(stepscale))+'_loglike.out',loglike_chain[:stop_step])
+np.savetxt(lindir+'/t'+str(int(temperature))+'_s'+str(int(stepscale))+'_repeat.out',repeat_chain[:stop_step])
 
-
+### save local as well
+best_ind = np.argmax(loglike_chain)
+np.savetxt(lindir+'/t'+str(int(temperature))+'_s'+str(int(stepscale))+'_local_prob_best.out',local__prob_chain[best_ind,:])
+np.savetxt(lindir+'/t'+str(int(temperature))+'_s'+str(int(stepscale))+'_local_best.out',local_chain[best_ind,:])

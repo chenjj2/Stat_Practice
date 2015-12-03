@@ -13,7 +13,8 @@ file = [
 '2015-Hatzes/browndwarfs.csv', #4
 '2015-Hatzes/otherstars.csv', #5
 'DKipping/moons.dat', #6
-'TEPCat/allplanets.csv', #7
+#'TEPCat/allplanets.csv', #7
+'TEPCat/allplanets-1202.csv', #7
 'Wiki/dwarfplanet.csv', #8
 'NASA/solarplanets.csv' #9
 ]
@@ -135,7 +136,8 @@ d9 = np.hstack(( d9_m, err, d9_r, err ))
 whole_dat = np.vstack(( d0,d1,d3,d4,d5,d6,d7,d8,d9 ))
 
 dpl = np.vstack(( d6, d8 ))
-pl = np.vstack(( d7, d9 ))
+epl = d7
+spl = d9
 bd = d4
 st = np.vstack(( d0, d1, d3, d5 ))
 
@@ -158,12 +160,14 @@ def data():
 	return select(whole_dat)
 
 def multi_data():
-	return select(dpl), select(pl), select(bd), select(st)
+	return select(dpl), select(epl), select(spl), select(bd), select(st)
 
 
 ### examine data
 def plot():
-	plt.errorbar(whole_dat[:,0], whole_dat[:,2], xerr=whole_dat[:,1], yerr=whole_dat[:,3], fmt='.')
+	dat = select(whole_dat)
+	plt.plot(dat[:,0], dat[:,2], linestyle='None', marker='o', markerfacecolor='None', markeredgecolor='k')
+	#plt.errorbar(dat[:,0], dat[:,2], xerr=dat[:,1], yerr=dat[:,3], fmt='.')
 	plt.xscale('log'); plt.yscale('log')
 	plt.xlabel(r'M [M$_\oplus$]'); plt.ylabel(r'R [R$_\oplus$]')
 	plt.savefig('MR_data.png')
@@ -172,13 +176,14 @@ def plot():
 
 ### save data
 def save():
-	np.savetxt(dir+'Mine/PlanetGroup.txt', whole_dat)
+	np.savetxt(dir+'Mine/PlanetGroup.txt', data())
 	return 0
 
 ### save multi
 def save_multi():
 	np.savetxt(dir+'Mine/dpl.txt', select(dpl))
-	np.savetxt(dir+'Mine/pl.txt', select(pl))
+	np.savetxt(dir+'Mine/epl.txt', select(epl))
+	np.savetxt(dir+'Mine/spl.txt', select(spl))
 	np.savetxt(dir+'Mine/bd.txt', select(bd))
 	np.savetxt(dir+'Mine/st.txt', select(st))
 	return 0
@@ -186,6 +191,8 @@ def save_multi():
 
 ### main
 if __name__ == '__main__':
-	save_multi()
+	#save()
+	#save_multi()
+	plot()
 
 

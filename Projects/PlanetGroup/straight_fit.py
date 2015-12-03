@@ -11,6 +11,31 @@ from NaiveMC.mcmc import hbm_joint_cdf
 from scipy.stats import norm, uniform
 from func import indicate, split_hyper_linear, piece_linear, convert_data
 
+###
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("dir")
+#parser.add_argument("seed", type=int)
+parser.add_argument("hyperic")
+args = parser.parse_args()
+
+
+### output dir
+dir = args.dir
+
+### input hyper prob start position
+hyperic = args.hyperic
+
+### seed
+import os
+pid = os.getpid()
+np.random.seed(pid)
+
+print 'output directory', dir
+print 'random seed', pid
+print 'hyper prob0', hyperic
+
+
 ### fix the number of different populations
 n_pop = 4
 
@@ -27,8 +52,6 @@ dat_varm = convert_data(dat[~m_exact])
 ### some static parameter 
 n_fixm = np.shape(dat_fixm)[0]
 n_varm = np.shape(dat_varm)[0]
-m_max = np.max(np.hstack((dat_fixm[:,0], dat_varm[:,0])))
-m_min = np.min(np.hstack((dat_fixm[:,0], dat_varm[:,0])))
 
 
 ### inverse sampling
@@ -38,8 +61,8 @@ def inverse_hyper(hyper_prob):
 	
 	C0 = uniform.ppf(prob_C0,-1.,2.)
 	slope = norm.ppf(prob_slope, 0.,5.)
-	sigma = 10.**( uniform.ppf(prob_sigma, -3., 3.) )
-	trans = np.sort( uniform.ppf(prob_trans, m_min, m_max-m_min) ) # sort
+	sigma = 10.**( uniform.ppf(prob_sigma, -3., 5.) )
+	trans = np.sort( uniform.ppf(prob_trans, -4., 10.) ) # sort
 
 	hyper = np.hstack(( C0, slope, sigma, trans ))
 
@@ -80,10 +103,31 @@ def split_group(hyper, local):
 
 	return sig_like_M0, sig_like_M1
 
+### change the intrinsic scatter of the degenerate group
+def split_group_complex(hyper, local):
+	#sig_const_M0, sig_const_M1 = split_group(hyper, local)
+
+	c, slope, sigma, trans = split_hyper_linear(hyper)
+	M1 = local[n_fixm:n_fixm+n_varm]
+
+	sig_M0 = np.zeros_like(M0)
+        for i in range(n_pop):
+                sig_M0 += sigma[i] * indicate(M0,trans,i)
+
+        sig_M1 = np.zeros_like(M1)
+        for i in range(n_pop):
+                sig_M1 += sigma[i] * indicate(M1,trans,i)
+
+	# fix the intrinsic scatter in the 2nd(0,1,2) group(degenerate group)
+	# from constant to a straight line that smoothly goes from sigma_const_giant to sigma_const_degen
+	sig_M0 = sig_M0 + (sigma[1]-sigma[2]) * (trans[2] - M0) / (trans[1] - trans[2]) * indicate(M0, trans, 2)
+	sig_M1 = sig_M1 + (sigma[1]-sigma[2]) * (trans[2] - M1) / (trans[1] - trans[2]) * indicate(M1, trans, 2)	
+
+	return sig_M0, sig_M1
 
 ### likelihood
 def loglike_func(hyper,local, dat_fixm, dat_varm):
-	sigma_like_R0, sigma_like_R1 = split_group(hyper, local)
+	sigma_like_R0, sigma_like_R1 = split_group_complex(hyper, local)
 
 	# fix mass
 	Rob0 = dat_fixm[:,2]
@@ -110,33 +154,42 @@ def loglike_func(hyper,local, dat_fixm, dat_varm):
 
 ### mcmc
 
-n_step = int(5e6)
+n_step = int(1e2)
+#n_step = int(5e5)
 
-### FIXTHIS
-#hyper_prob0 = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.65, 0.8])
-### ENDFIX
-hyper_stepsize = 1e-4 * np.ones(3*n_pop)
-#local_prob0 = 0.5 * np.ones(n_fixm + 2*n_varm)
-local_prob0 = np.random.uniform(0.,1., n_fixm + 2*n_varm)
-local_stepsize = 1e-4 * np.ones(n_fixm + 2*n_varm)
+#hyper_prob0 = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.45, 0.6, 0.8])
+#hyper_prob0 = np.array([0.5, 0.5, 0.55, 0.5, 0.55, 0.3, 0.5, 0.4, 0.3, 0.45, 0.6, 0.8])
+hyper_prob0 = np.loadtxt(hyperic)
+hyper_stepsize = (2.*1e-4) * np.ones(3*n_pop)
+local_prob0 = 0.5 * np.ones(n_fixm + 2*n_varm)
+local_stepsize = (2.*1e-4) * np.ones(n_fixm + 2*n_varm)
 
-import time
-print 'start:', time.asctime()
 
 hyper_prob_chain, hyper_chain, local_prob_chain, local_chain, \
 loglike_chain, repeat_chain, stop_step = \
 hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_step,\
 			inverse_hyper, inverse_local, \
 			loglike_func, data = [dat_fixm, dat_varm], \
-			trial_upbound = 100*n_step)
+			trial_upbound = 20*n_step)
 
-print 'end', time.asctime()
-print 'stop', stop_step
+### save
+np.savetxt(dir+'hyper_prob.out',hyper_prob_chain[:stop_step,:])
+np.savetxt(dir+'hyper.out',hyper_chain[:stop_step,:])
+np.savetxt(dir+'loglike.out',loglike_chain[:stop_step])
+np.savetxt(dir+'repeat.out',repeat_chain[:stop_step])
 
-### plot
-np.savetxt('str_hyper_prob.out',hyper_prob_chain[:stop_step,:])
-np.savetxt('str_hyper.out',hyper_chain[:stop_step,:])
-np.savetxt('str_loglike.out',loglike_chain[:stop_step])
-np.savetxt('str_repeat.out',repeat_chain[:stop_step])
+### save top for restart
+top_ind = np.argsort(loglike_chain)[-100:]
+np.savetxt(dir+'local_prob_top.out',local_prob_chain[top_ind,:])
+np.savetxt(dir+'local_top.out',local_chain[top_ind,:])
+np.savetxt(dir+'hyper_prob_top.out',hyper_prob_chain[top_ind,:])
+np.savetxt(dir+'hyper_top.out',hyper_chain[top_ind,:])
+
+### save last for resume
+last_ind = stop_step-1
+np.savetxt(dir+'local_prob_last.out',local_prob_chain[last_ind,:])
+np.savetxt(dir+'hyper_prob_last.out',hyper_prob_chain[last_ind,:])
+
+
 
 

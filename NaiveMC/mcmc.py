@@ -7,8 +7,6 @@ function:
 	- hbm_initial
 	- hbm_likelihood
 	- hbm
-* auto_burn
-
 '''
 
 # import
@@ -275,9 +273,7 @@ def jump_prob(para, stepsize, continuous=False):
 def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_step,\
 				inverse_hyper, inverse_local, \
 				loglike_func, data, \
-				trial_upbound = 1e5, random_seed = 2357):
-	
-	np.random.seed(random_seed)
+				trial_upbound = 1e5):
 
 	### initial setup
 	n_hyper = len(hyper_prob0)
@@ -295,10 +291,8 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 	local_chain[0] = local0
 
 	loglikelihood_chain = np.repeat(-np.inf, n_step)
-	# FIXME
 	#loglikelihood0 = data_given_local(local0, model, *data) + np.sum(np.log(local_prob0))
 	loglikelihood0 = loglike_func(hyper0, local0, *data)
-	# ENDFIXME
 	loglikelihood_chain[0] = loglikelihood0
 
 	repeat_chain = np.zeros((n_step,), dtype=np.int)
@@ -326,10 +320,8 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 			hyper_new = inverse_hyper(hyper_prob_new)
 			local_new = inverse_local(local_prob_new, hyper_new)
 
-			# FIXME
 			#loglikelihood_new = data_given_local(local_new, model, *data) + np.sum(np.log(local_prob_new))
 			loglikelihood_new = loglike_func(hyper_new, local_new, *data)
-			# ENDFIXME
 	
 			### accept/reject		
 			ratio = np.exp(loglikelihood_new - loglikelihood_old)
@@ -355,37 +347,5 @@ def hbm_joint_cdf(hyper_prob0, hyper_stepsize, local_prob0, local_stepsize, n_st
 	return hyper_prob_chain, hyper_chain, local_prob_chain, local_chain, \
 			loglikelihood_chain, repeat_chain, i_step
 
-
-
-''' auto_burn '''
-### pick the first step that p == median(p_chain)
-
-def almost_equal(array,value,tolerance=0.):
-	diff = np.abs(array - value)
-	return diff<=tolerance
-
-def auto_burn(p_seq, tolerance=[], fix_ratio=0.5):
-	n_para, n_step = np.shape(p_seq)
-
-	p_median = np.median(p_seq, axis=1)
-
-	if len(tolerance)!=0:
-		t = tolerance
-	else:
-		p_stddev = np.std(p_seq, axis=1)
-		t = p_stddev / n_step
-
-	burn = (n_step-1) * np.ones(n_para)
-	for i_para in range(n_para):
-		burn_ind = np.where( almost_equal(p_seq[i_para,:],p_median[i_para],t[i_para]) )[0]
-		if len(burn_ind)==0: burn[i_para] = n_step-1
-		else: burn[i_para] = burn_ind[0]
-
-	burn_step = np.max(burn)
-
-	# if the NO burn in, just use the last half of the chain
-	if burn_step==n_step-1: burn_step= int(n_step * fix_ratio)
-	
-	return burn_step
 
 

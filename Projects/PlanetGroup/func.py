@@ -91,5 +91,21 @@ def piece_linear(hyper, M, prob_R):
 
 	return R
 
+### based on piece_linear
+### but the intrinsic scatter in degenerate group is linear rather than constant
+def piece_linear_complex(hyper, M, prob_R):
+	c, slope, sigma, trans = split_hyper_linear(hyper)
+	R = np.zeros_like(M)
+	for i in range(4):
+		ind = indicate(M, trans, i)
+		mu = c[i] + M[ind]*slope[i]
+		if i==2: # degenerate group
+			sig = sigma[2] + (sigma[1]-sigma[2]) * (trans[2]-M[ind]) / (trans[2]-trans[1])
+		else:
+			sig = sigma[i]
+		R[ind] = norm.ppf(prob_R[ind], mu, sig)
+
+	return R	
+
 
 
