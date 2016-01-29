@@ -1,0 +1,136 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[ansinew]{inputenc}
+
+\usepackage{lmodern}	% font definition
+\usepackage{amsmath}	% math fonts
+\usepackage{amsthm}
+\usepackage{amsfonts}
+
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows}
+\usetikzlibrary{calc}
+
+%%%<
+\usepackage{verbatim}
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{tikzpicture}
+\setlength\PreviewBorder{5pt}%
+%%%>
+
+%\usetikzlibrary{decorations.pathmorphing} % noisy shapes
+\usetikzlibrary{fit}					% fitting shapes to coordinates
+\usetikzlibrary{backgrounds}	% drawing the background after the foreground
+
+\begin{document}
+
+\begin{figure}[htbp]
+\centering
+% define hyper shape
+\tikzstyle{hyper}=[draw, ellipse,
+                                    minimum height=1.2cm,
+                                    minimum width = 1.8cm,
+                                    fill=yellow!100]
+% define local shape
+\tikzstyle{local}=[draw, ellipse,
+				minimum height=1.2cm,
+				minimum width = 1.8cm]
+
+% define data shape
+\tikzstyle{data}=[draw, ellipse,
+                                    minimum height=1.2cm,
+                                    minimum width = 1.8cm,
+                                    fill=gray!50]
+
+% define data shape
+\tikzstyle{blank}=[draw, ellipse,
+                                    minimum height=1.2cm,
+                                    minimum width = 1.8cm,
+                                    draw = gray!0,
+                                    fill=gray!0]
+
+
+% define background rectangle
+\tikzstyle{background}=[rectangle,
+					draw = gray!100,
+					inner sep=0.4cm]
+
+% define special arrow
+\tikzset{
+  -|-/.style={
+    to path={
+      (\tikztostart) -| ($(\tikztostart)!#1!(\tikztotarget)$) |- (\tikztotarget)
+      \tikztonodes
+    }
+  },
+  -|-/.default=0.3,
+  |-|/.style={
+    to path={
+      (\tikztostart) |- ($(\tikztostart)!#1!(\tikztotarget)$) -| (\tikztotarget)
+      \tikztonodes
+    }
+  },
+  |-|/.default=0.3,
+}
+
+% draw
+\begin{tikzpicture}[node distance = 0.8cm, >=latex,text height=1.5ex,text depth=0.25ex]
+
+  % The various elements are conveniently placed using a matrix:
+  \matrix[row sep=1.5cm,column sep=0.5cm] {
+    % First line
+        \node (alpha) [local] {$\alpha$}; &
+        \node (offset)   [hyper] {$C$};     &
+        \node (slope) [hyper] {$S^{(1-4)}$}; &
+        \node (scatter) [hyper] {$\sigma_R^{(1-4)}$}; &
+        \node (transition) [hyper] {$T^{(1-3)}$};
+	\\
+    % Second line          
+        \node (merr) [data] {$\Delta M^{(i)}_{ob}$}; &
+        \node (mt)   [local] {$M_t^{(i)}$};     &
+        \node (rt) [local] {$R_t^{(i)}$}; &
+        \node (rerr) [data] {$\Delta R^{(i)}_{ob}$}; &
+        \node (2ndright) [blank] { };
+        \\
+    % Third line
+        &
+        \node (mob) [data] {$M_{ob}^{(i)}$}; &
+        \node (rob)   [data] {$R_{ob}^{(i)}$};  &
+        \node (bottomright) [blank]{$N$};
+        \\
+    };
+    
+    % The diagram elements are now connected through arrows:
+    \path[->]
+        (alpha) edge (mt)
+        
+        (mt) edge (rt)
+        (slope) edge (rt)
+        
+        (merr) edge (mob)
+        (mt) edge (mob)
+        (rerr) edge (rob)
+        (rt) edge (rob)        	              
+        ;
+    
+    \draw[->] (offset.south) to[|-|] (rt.north);
+    \draw[->] (scatter.south) to[|-|] (rt.north);
+    \draw[->] (transition.south) to[|-|] (rt.north);
+ 
+ % rectangle
+    \begin{pgfonlayer}{background}      
+        \node [background,
+                    fit=(merr) (bottomright),
+                    ] {};
+    \end{pgfonlayer}
+    
+    
+\end{tikzpicture}
+
+\end{figure}
+
+
+
+\end{document}

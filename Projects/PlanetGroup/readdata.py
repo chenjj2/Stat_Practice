@@ -14,7 +14,8 @@ file = [
 '2015-Hatzes/otherstars.csv', #5
 'DKipping/moons.dat', #6
 #'TEPCat/allplanets.csv', #7
-'TEPCat/allplanets-1202.csv', #7
+#'TEPCat/allplanets-1202.csv', #7
+'TEPCat/allplanets-0125.csv', #7
 'Wiki/dwarfplanet.csv', #8
 'NASA/solarplanets.csv' #9
 ]
@@ -36,12 +37,10 @@ rearth2km = 6371.0
 def select_gaussian(err):
 	up = err[:,0]
 	down = err[:,1]
-
 	mean_err = (up+down)/2.
-	diff = np.abs(up-down) / mean_err
-	
+	diff = np.abs(up-down) / mean_err	
+	#ind = diff<0.1	
 	ind = diff<0.1
-	
 	return ind, mean_err.reshape(len(up),1)
 
 
@@ -192,7 +191,8 @@ def save_multi():
 ### main
 if __name__ == '__main__':
 	#save()
-	#save_multi()
-	plot()
-
+	save_multi()
+	#plot()
+	#np.savetxt('test3.txt',data())
+	#np.savetxt(dir+'Mine/PlanetGroup-0125.txt',data())
 

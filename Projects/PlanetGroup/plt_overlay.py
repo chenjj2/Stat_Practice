@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import *
-from func import convert_data, piece_linear
+from func import convert_data, piece_linear, piece_linear_complex
 from scipy.stats import percentileofscore
 
 from matplotlib.backends.backend_pdf import PdfPages
@@ -22,51 +22,15 @@ data = [dwarfplanet, exoplanet, browndwarf, star]
 solarplanet = convert_data( np.loadtxt(data_dir+'spl.txt') )
 
 
-### mcmc result, FIXME
-mcmc_dir = '/Users/jingjing/Work/DK_project/Output/OutFile/PlanetGroup/straight/'
-hyper = np.loadtxt(mcmc_dir+'str_hyper.out')
-loglike = np.loadtxt(mcmc_dir+'str_loglike.out')
+### mcmc result, spatial_median and trans_1up/down
 
-### burn out
-nburn = np.shape(hyper)[0]/2
-hyper = hyper[nburn:,:]
-loglike = loglike[nburn:]
-
-# best fit
-best_ind = np.argmax(loglike)
-best_hyper = hyper[best_ind]
-print 'best_hyper', best_hyper
-
-
-# thin
-def thin(origin, fraction=0.5, jump=25):
-	n_step = np.shape(origin)[0]
-	n_start = int(n_step*fraction)
-	h = origin[n_start:n_step:jump, ]
-	return h
-
-#thin_hyper = thin(hyper)
-
-### split data
-slope_best = best_hyper[1:5]
-trans = hyper[:,9:12]
-
-
-# 68, 95 percentage of translocation
-def quantile(para, mid_point):
-	one_up = np.zeros(3)
-	one_down = np.zeros(3)
-	for i in range(3):	
-		quantile_mid = percentileofscore(para[:,i], mid_point[i])
-		print quantile_mid
-		one_up[i] = np.percentile(para[:,i], np.min([quantile_mid + 34.,100.]), interpolation='nearest')
-		one_down[i] = np.percentile(para[:,i], np.max([quantile_mid - 34., 0.]), interpolation='nearest')
-
-	return one_up, one_down
-
-# trans stat
+best_hyper = np.loadtxt('h4_spatial_median.txt', delimiter=',')
 trans_best = best_hyper[-3:]
-trans_1up, trans_1down = quantile(trans, trans_best)
+slope_best = best_hyper[1:5]
+# find_best.py with spatial_median.txt and find trans_1up/down
+trans_1up = trans_best + np.array([0.1245372 , 0.0534476 ,  0.04035559])
+trans_1down = trans_best - np.array([0.14317994, 0.06079727,  0.03514506 ])
+
 
 # convert trans best
 mearth2mjup = 317.828
@@ -76,6 +40,10 @@ m_trans = 10.**trans_best
 m1 = m_trans[0]
 m2 = m_trans[1] / mearth2mjup
 m3 = m_trans[2] / mearth2msun
+
+# find the corresponding R at transition points
+rad_trans = 10.** piece_linear( best_hyper, trans_best, prob_R = 0.5*np.ones(3) )
+print 'radius at transition (RE)/(RJ)', rad_trans, rad_trans/11.21
 
 
 ### plot
@@ -104,25 +72,32 @@ plt.fill_between(m_sample, r_2lower, r_2upper, color='grey', alpha=0.4)
 
 # trans location
 for i in range(len(trans_best)):
-	plt.axvline(trans_best[i], linestyle = 'dashed' , color='k', alpha=0.9, linewidth=0.5)
-	plt.axvline(trans_1up[i], linestyle = 'dotted', color='k',alpha=0.8, linewidth=0.5)
-	plt.axvline(trans_1down[i], linestyle = 'dotted', color='k',alpha=0.8, linewidth=0.5)
+	plt.plot([trans_best[i]]*2, [-1.2,1.9], linestyle = 'dashed' , color='k', alpha=0.9, linewidth=0.5)
+	plt.plot([trans_1up[i]]*2, [-1.2,1.9], linestyle = 'dotted' , color='k', alpha=0.8, linewidth=0.5)
+	plt.plot([trans_1down[i]]*2, [-1.2,1.9], linestyle = 'dotted' , color='k', alpha=0.8, linewidth=0.5)
 
 # trans footnote
 footnote_fontsize = 9
-plt.text(0.1,-0.8,r'$\rm %.1f M_\oplus$' % m1 , fontsize=footnote_fontsize, rotation=90)
-plt.text(1.5,-0.8,r'$\rm %.2f M_J$' % m2 , fontsize=footnote_fontsize, rotation=90)
-plt.text(4.,-0.7,r'$\rm %.3f M_\odot$' % m3 , fontsize=footnote_fontsize, rotation=90)
+plt.text(trans_1down[0]-0.26,-0.8,r'$\rm %.1f M_\oplus$' % m1 , fontsize=footnote_fontsize, rotation=90)
+plt.text(trans_1down[1]-0.26,-0.79,r'$\rm %.2f M_J$' % m2 , fontsize=footnote_fontsize, rotation=90)
+plt.text(trans_1down[2]-0.26,-0.72,r'$\rm %.3f M_\odot$' % m3 , fontsize=footnote_fontsize, rotation=90)
 
 # trans topnote
-plt.text(0.1,2.02, r'$\rm volatile$', fontsize=footnote_fontsize, rotation=90)
-plt.text(0.8,2.05, r'$\rm accretion$', fontsize=footnote_fontsize, rotation=90)
+#plt.text(trans_1down[0]-0.26,2.02, r'$\rm volatile$', fontsize=footnote_fontsize, rotation=90)
+#plt.text(trans_1up[0]+0.05,2.05, r'$\rm accretion$', fontsize=footnote_fontsize, rotation=90)
+plt.text(trans_best[0]-0.45,2.02, r'$\rm volatile$', fontsize=footnote_fontsize)
+plt.text(trans_best[0]-0.5,1.92, r'$\rm accretion$', fontsize=footnote_fontsize)
 
-plt.text(1.5,2., r'$\rm grav.$', fontsize=footnote_fontsize, rotation=90)
-plt.text(2.1,2.05, r'$\rm compression$', fontsize=footnote_fontsize, rotation=90)
+#plt.text(trans_1down[1]-0.26,1.93, r'$\rm grav.$', fontsize=footnote_fontsize, rotation=90)
+#plt.text(trans_1up[1]+0.05,2.05, r'$\rm compression$', fontsize=footnote_fontsize, rotation=90)
+plt.text(trans_best[1]-0.25,2.02, r'$\rm grav.$', fontsize=footnote_fontsize)
+plt.text(trans_best[1]-0.6,1.92, r'$\rm compression$', fontsize=footnote_fontsize)
 
-plt.text(4.05,2.05, r'$\rm hydrogen$', fontsize=footnote_fontsize, rotation=90)
-plt.text(4.55,2.02, r'$\rm burning$', fontsize=footnote_fontsize, rotation=90)
+
+#plt.text(trans_1down[2]-0.26,2.05, r'$\rm hydrogen$', fontsize=footnote_fontsize, rotation=90)
+#plt.text(trans_1up[2]+0.05,2.02, r'$\rm burning$', fontsize=footnote_fontsize, rotation=90)
+plt.text(trans_best[2]-0.45,2.02, r'$\rm hydrogen$', fontsize=footnote_fontsize)
+plt.text(trans_best[2]-0.4,1.92, r'$\rm burning$', fontsize=footnote_fontsize)
 
 
 # class footnote
@@ -156,29 +131,26 @@ ax.add_patch(r)
 
 
 # data
-fmts = ['^','o','s','h']
+fmts = ['^','o','s','*']
+size = [4,4,4,6]
 legends = []
 for i,datum in enumerate(data):
 	dat = convert_data(datum)
 	alegend, = plt.plot(dat[:,0], dat[:,2], linestyle='None',
-					marker=fmts[i], markersize=4, 
+					marker=fmts[i], markersize=size[i], 
 					markerfacecolor = 'None', markeredgecolor='k', markeredgewidth=0.5
 				)
-	'''plt.errorbar(dat[:,0], dat[:,2], xerr=dat[:,1], yerr=dat[:,3], 
-				ecolor='k', fmt='none',
-				capsize=0, capthick=1, elinewidth=0.5,
-				zorder = 50)'''
 	legends.append(alegend)
 
 plt.legend(legends,[r'$\rm moons/dwarf\ planets$',r'$\rm exoplanets$',r'$\rm brown\ dwarfs$',r'$\rm stars$'],
-			loc=(0.04,0.7),prop={'size':9}, numpoints=1)
+			loc=(0.04,0.68),prop={'size':9}, numpoints=1)
 
 
 ### plot solar planets symbol
 plt.plot(solarplanet[:,0],solarplanet[:,2], 'm.', markersize = 0.5)
 # earth
-plt.plot(solarplanet[2,0],solarplanet[2,2], '+', markerfacecolor = 'None', markeredgecolor='#71EEB8', markersize = 4, markeredgewidth=0.5)
-plt.plot(solarplanet[2,0],solarplanet[2,2], 'o', markerfacecolor = 'None', markeredgecolor='#71EEB8', markersize = 4, markeredgewidth=0.5)
+plt.plot(solarplanet[2,0],solarplanet[2,2], '+', markerfacecolor = 'None', markeredgecolor='#ffa500', markersize = 4, markeredgewidth=0.5)
+plt.plot(solarplanet[2,0],solarplanet[2,2], 'o', markerfacecolor = 'None', markeredgecolor='#ffa500', markersize = 4, markeredgewidth=0.5)
 
 
 # set log scale ticks
@@ -228,7 +200,6 @@ plt.ylabel(r'$\rm R/R_\oplus$', fontsize=12) # may inverse the letter by specify
 ax.xaxis.set_label_coords(0.5,-0.06)
 ax.yaxis.set_label_coords(-0.08,0.5)
 #ax.yaxis.set_label_coords(-0.08,0.47)
-
 
 
 pp.savefig()
